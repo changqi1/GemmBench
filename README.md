@@ -2,8 +2,8 @@
 # gemmbench
 
 - `build_gemmbench.sh` to build mkldnn, eigen, xbyak env
-- `cd src`
 - `./run.sh 128 768 768` to run gemm by kernel size `m n k`
+- `vim run.sh` to config benchmark
 
 
 benchmark list:
