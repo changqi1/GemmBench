@@ -15,6 +15,7 @@ echo "cpus: "$cpus
 
 ####################################################################
 
+cd src
 sh ./compile.sh
 
 export OMP_NUM_THREADS=$core_num

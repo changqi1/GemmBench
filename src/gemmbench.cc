@@ -11,8 +11,8 @@
 #include <mkl.h>
 #include <Eigen/Dense>
 
-#define XBYAK_NO_OP_NAMES
-#include <xbyak.h>
+//#define XBYAK_NO_OP_NAMES
+//#include <xbyak.h>
 
 typedef mkldnn::impl::bfloat16_t bfloat16;
 
@@ -30,7 +30,7 @@ double test_mkldnn_gemm_bf16bf16f32_omp_cvt(float *A, float *B, float *C, int m,
 double test_mkldnn_gemm_bf16bf16f32_transB_omp_cvt(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16);
 double test_mkldnn_cvt_float_to_bfloat16(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16);
 double test_mkldnn_omp_cvt_float_to_bfloat16(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16);
-double test_jit_cvt_float_to_bfloat16(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16);
+//double test_jit_cvt_float_to_bfloat16(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16);
 
 int main(int argc, char *argv[])
 {
@@ -71,7 +71,7 @@ int main(int argc, char *argv[])
     double t_mkldnn_gemm_bf16_tB_omp_cvt = test_mkldnn_gemm_bf16bf16f32_transB_omp_cvt(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
     double t_mkldnn_cvt     = test_mkldnn_cvt_float_to_bfloat16(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
     double t_mkldnn_omp_cvt = test_mkldnn_omp_cvt_float_to_bfloat16(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
-    double t_mkldnn_jit_cvt = test_jit_cvt_float_to_bfloat16(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
+    //double t_mkldnn_jit_cvt = test_jit_cvt_float_to_bfloat16(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
 
     printf("\n>> omp num_procs: %d\n", omp_get_num_procs());
     printf("eigen gemm: \t%.6f\n", t_eigen_sgemm);
@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
     printf("mkldnn bgemm+transB+omp_cvt: \t%.6f \t+%.3fX\n", t_mkldnn_gemm_bf16_tB_omp_cvt, t_mkl_sgemm/t_mkldnn_gemm_bf16_tB_omp_cvt);
     printf("mkldnn cvt:     \t%.6f \tt/bgemm:   %.3f%\n", t_mkldnn_cvt,     t_mkldnn_cvt/t_mkldnn_gemm_bf16*100);
     printf("mkldnn omp_cvt: \t%.6f \tt/bgemm:   %.3f%\n", t_mkldnn_omp_cvt, t_mkldnn_omp_cvt/t_mkldnn_gemm_bf16*100);
-    printf("mkldnn jit_cvt: \t%.6f \tt/bgemm:   %.3f%\n", t_mkldnn_jit_cvt, t_mkldnn_jit_cvt/t_mkldnn_gemm_bf16*100);
+    //printf("mkldnn jit_cvt: \t%.6f \tt/bgemm:   %.3f%\n", t_mkldnn_jit_cvt, t_mkldnn_jit_cvt/t_mkldnn_gemm_bf16*100);
 
     delete[] A_bf16;
     delete[] B_bf16;
@@ -337,7 +337,7 @@ double test_mkldnn_omp_cvt_float_to_bfloat16(float *A, float *B, float *C, int m
 
     return tag_diff;
 }
-
+/*
 struct Code : Xbyak::CodeGenerator {
     const Xbyak::Reg64& src;
     const Xbyak::Reg64& dst;
@@ -381,4 +381,4 @@ double test_jit_cvt_float_to_bfloat16(float *A, float *B, float *C, int m, int n
 
     return tag_diff;
 }
-
+*/
