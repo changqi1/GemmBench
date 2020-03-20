@@ -1,0 +1,191 @@
+diff --git a/src/common/bfloat16.hpp b/include/bfloat16.hpp
+similarity index 71%
+rename from src/common/bfloat16.hpp
+rename to include/bfloat16.hpp
+index 6ec656dd3..80f54c69b 100644
+--- a/src/common/bfloat16.hpp
++++ b/include/bfloat16.hpp
+@@ -41,16 +41,26 @@ struct bfloat16_t {
+ 
+ static_assert(sizeof(bfloat16_t) == 2, "bfloat16_t must be 2 bytes");
+ 
+-void cvt_float_to_bfloat16(bfloat16_t *out, const float *inp, size_t size);
+-void cvt_bfloat16_to_float(float *out, const bfloat16_t *inp, size_t size);
++void MKLDNN_API cvt_float_to_bfloat16(bfloat16_t *out, const float *inp, size_t size);
++void MKLDNN_API cvt_bfloat16_to_float(float *out, const bfloat16_t *inp, size_t size);
+ 
+ // performs element-by-element sum of inp and add float arrays and stores
+ // result to bfloat16 out array with downconversion
+-void add_floats_and_cvt_to_bfloat16(bfloat16_t *out, const float *inp0,
++void MKLDNN_API add_floats_and_cvt_to_bfloat16(bfloat16_t *out, const float *inp0,
+         const float *inp1, size_t size);
+ 
+ }
+ }
+ 
++extern "C" {
++mkldnn_status_t MKLDNN_API mkldnn_gemm_bf16bf16f32(
++        char transa, char transb,
++        mkldnn_dim_t M, mkldnn_dim_t N, mkldnn_dim_t K,
++        float alpha,
++        const mkldnn::impl::bfloat16_t *A, mkldnn_dim_t lda,
++        const mkldnn::impl::bfloat16_t *B, mkldnn_dim_t ldb,
++        float beta, float *C, mkldnn_dim_t ldc);
++}
++
+ #endif
+ 
+diff --git a/src/cpu/gemm/gemm.cpp b/src/cpu/gemm/gemm.cpp
+index d1e9b7e92..8c63ee147 100644
+--- a/src/cpu/gemm/gemm.cpp
++++ b/src/cpu/gemm/gemm.cpp
+@@ -33,7 +33,7 @@
+ #include "s8x8s32/simple_gemm_s8s8s32.hpp"
+ 
+ #include "os_blas.hpp"
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ 
+ namespace mkldnn {
+ namespace impl {
+@@ -358,7 +358,7 @@ mkldnn_status_t mkldnn_gemm_s8s8s32(
+ }
+ 
+ extern "C" {
+-mkldnn_status_t MKLDNN_API mkldnn_gemm_bf16bf16f32(
++mkldnn_status_t mkldnn_gemm_bf16bf16f32(
+         char transa, char transb,
+         mkldnn_dim_t M, mkldnn_dim_t N, mkldnn_dim_t K,
+         float alpha,
+@@ -370,5 +370,4 @@ mkldnn_status_t MKLDNN_API mkldnn_gemm_bf16bf16f32(
+     return gemm_bf16bf16f32(&transb, &transa, &N, &M, &K,
+             &alpha, B, &ldb, A, &lda, &beta, C, &ldc);
+ }
+-
+ }
+diff --git a/src/cpu/gemm/gemm_driver.cpp b/src/cpu/gemm/gemm_driver.cpp
+index 5647c5ae4..fd2d38c76 100644
+--- a/src/cpu/gemm/gemm_driver.cpp
++++ b/src/cpu/gemm/gemm_driver.cpp
+@@ -21,7 +21,7 @@
+ 
+ #include "gemm_driver.hpp"
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "f32/gemm_utils_f32.hpp"
+ #include "f32/jit_avx512_common_gemm_f32.hpp"
+ #include "f32/jit_avx_gemm_f32.hpp"
+diff --git a/src/cpu/gemm/gemm_info.cpp b/src/cpu/gemm/gemm_info.cpp
+index 7ae298ca0..45f042587 100644
+--- a/src/cpu/gemm/gemm_info.cpp
++++ b/src/cpu/gemm/gemm_info.cpp
+@@ -25,7 +25,7 @@
+ #include "mkldnn_types.h"
+ #include "bf16/common_s16.hpp"
+ #include "bf16/jit_avx512_core_gemm_bf16bf16f32_kern.hpp"
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "f32/common_f32.hpp"
+ #include "f32/jit_avx2_kernel_sgemm_kern.hpp"
+ #include "f32/jit_avx_gemv_t_f32_kern.hpp"
+diff --git a/src/cpu/gemm/gemv_driver.cpp b/src/cpu/gemm/gemv_driver.cpp
+index deb58cf7a..c7d246a97 100644
+--- a/src/cpu/gemm/gemv_driver.cpp
++++ b/src/cpu/gemm/gemv_driver.cpp
+@@ -18,7 +18,7 @@
+ 
+ #include "gemv_driver.hpp"
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "cpu_isa_traits.hpp"
+ #include "gemm_info.hpp"
+ #include "jit_generator.hpp"
+diff --git a/src/cpu/gemm/s8x8s32/jit_avx512_core_gemv_s8u8s32.cpp b/src/cpu/gemm/s8x8s32/jit_avx512_core_gemv_s8u8s32.cpp
+index 5950f8ad0..2b97009c7 100644
+--- a/src/cpu/gemm/s8x8s32/jit_avx512_core_gemv_s8u8s32.cpp
++++ b/src/cpu/gemm/s8x8s32/jit_avx512_core_gemv_s8u8s32.cpp
+@@ -21,7 +21,7 @@
+ #include "jit_generator.hpp"
+ #include "mkldnn_thread.hpp"
+ #include "nstl.hpp"
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ 
+ namespace mkldnn {
+ namespace impl {
+diff --git a/src/cpu/gemm_bf16_convolution.cpp b/src/cpu/gemm_bf16_convolution.cpp
+index 94539f6f8..daed944dc 100644
+--- a/src/cpu/gemm_bf16_convolution.cpp
++++ b/src/cpu/gemm_bf16_convolution.cpp
+@@ -21,7 +21,7 @@
+ #include "utils.hpp"
+ #include "type_helpers.hpp"
+ #include "mkldnn_thread.hpp"
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ 
+ namespace mkldnn {
+ namespace impl {
+diff --git a/src/cpu/gemm_convolution_utils.cpp b/src/cpu/gemm_convolution_utils.cpp
+index 01380b292..74383aca3 100644
+--- a/src/cpu/gemm_convolution_utils.cpp
++++ b/src/cpu/gemm_convolution_utils.cpp
+@@ -24,7 +24,7 @@
+ 
+ #include "gemm_convolution_utils.hpp"
+ #include "jit_generator.hpp"
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ 
+ namespace mkldnn {
+ namespace impl {
+diff --git a/tests/benchdnn/mkldnn_common.hpp b/tests/benchdnn/mkldnn_common.hpp
+index 0896871b8..639efeae2 100644
+--- a/tests/benchdnn/mkldnn_common.hpp
++++ b/tests/benchdnn/mkldnn_common.hpp
+@@ -22,7 +22,7 @@
+ #include <vector>
+ 
+ #include "mkldnn.h"
+-#include "src/common/bfloat16.hpp"
++#include "include/bfloat16.hpp"
+ #include "src/common/float16.hpp"
+ #include "src/common/nstl.hpp"
+ 
+diff --git a/tests/gtests/mkldnn_test_common.hpp b/tests/gtests/mkldnn_test_common.hpp
+index 55704e535..a1acf396e 100644
+--- a/tests/gtests/mkldnn_test_common.hpp
++++ b/tests/gtests/mkldnn_test_common.hpp
+@@ -42,7 +42,7 @@
+ #include "src/common/mkldnn_thread.hpp"
+ #include "src/common/memory_desc_wrapper.hpp"
+ #include "src/common/float16.hpp"
+-#include "src/common/bfloat16.hpp"
++#include "include/bfloat16.hpp"
+ #include "src/common/nstl.hpp"
+ 
+ using mkldnn::impl::f16_support::float16_t;
+diff --git a/tests/gtests/test_gemm_common.hpp b/tests/gtests/test_gemm_common.hpp
+index 7be427263..ef2f02185 100644
+--- a/tests/gtests/test_gemm_common.hpp
++++ b/tests/gtests/test_gemm_common.hpp
+@@ -60,17 +60,6 @@ mkldnn_status_t mkldnn_ocl_hgemm(cl_command_queue queue, char transa,
+ }
+ #endif
+ 
+-// Declare bfloat16 GEMM interfaces for testing
+-extern "C" {
+-mkldnn_status_t mkldnn_gemm_bf16bf16f32(
+-        char transa, char transb,
+-        mkldnn_dim_t M, mkldnn_dim_t N, mkldnn_dim_t K,
+-        float alpha,
+-        const bfloat16_t *A, mkldnn_dim_t lda,
+-        const bfloat16_t *B, mkldnn_dim_t ldb,
+-        float beta, float *C, mkldnn_dim_t ldc);
+-}
+-
+ // Declare packed GEMM interfaces for testing
+ namespace mkldnn {
+ namespace impl {
