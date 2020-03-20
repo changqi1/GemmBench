@@ -55,7 +55,7 @@ int main(int argc, char *argv[])
     Eigen::MatrixXf C_mat(m, n);
 
     init_param(m, n, k, A, B, C, A_bf16, B_bf16, C_bf16, A_mat, B_mat, C_mat);
-    std::cout << "starting..." << std::endl;
+    std::cout << "\nstarting..." << std::endl;
 
     double t_eigen_sgemm  = test_eigen_sgemm(A_mat, B_mat, C_mat, m, n, k);
 
@@ -73,9 +73,9 @@ int main(int argc, char *argv[])
     double t_mkldnn_omp_cvt = test_mkldnn_omp_cvt_float_to_bfloat16(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
     double t_mkldnn_jit_cvt = test_jit_cvt_float_to_bfloat16(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
 
-    std::cout << ">> runtime: ms" << std::endl;
+    printf("\n>> omp num_procs: %d\n", omp_get_num_procs());
     printf("eigen gemm: \t%.6f\n", t_eigen_sgemm);
-    printf("mkl sgemm: \t%.6f  --> baseline\n", t_mkl_sgemm);
+    printf("mkl sgemm: \t%.6f ms --> baseline\n", t_mkl_sgemm);
     printf("mkl sgemm+transB:            \t%.6f \t+%.3fX\n", t_mkl_sgemm_tB,                t_mkl_sgemm/t_mkl_sgemm_tB);
     printf("mkldnn sgemm:                \t%.6f \t+%.3fX\n", t_mkldnn_sgemm,                t_mkl_sgemm/t_mkldnn_sgemm);
     printf("mkldnn bgemm:                \t%.6f \t+%.3fX\n", t_mkldnn_gemm_bf16,            t_mkl_sgemm/t_mkldnn_gemm_bf16);
@@ -260,14 +260,14 @@ double test_mkldnn_gemm_bf16bf16f32_transB_cvt(float *A, float *B, float *C, int
 
 double test_mkldnn_gemm_bf16bf16f32_omp_cvt(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16)
 {
-    #pragma omp parallel for num_threads(24)
+    #pragma omp parallel for num_threads(omp_get_num_procs())
     for (int i = 0; i < m; ++i)
         mkldnn::impl::cvt_float_to_bfloat16(A_bf16+i*k, A+i*k, k);
     mkldnn_gemm_bf16bf16f32('N', 'N', m, n, k, 1.0, A_bf16, k, B_bf16, n, 0.0, C, n);
 
     auto tag_1 = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < 1000; ++i) {
-        #pragma omp parallel for num_threads(24)
+        #pragma omp parallel for num_threads(omp_get_num_procs())
         for (int i = 0; i < m; ++i)
             mkldnn::impl::cvt_float_to_bfloat16(A_bf16+i*k, A+i*k, k);
 	mkldnn_gemm_bf16bf16f32('N', 'N', m, n, k, 1.0, A_bf16, k, B_bf16, n, 0.0, C, n);
@@ -282,14 +282,14 @@ double test_mkldnn_gemm_bf16bf16f32_omp_cvt(float *A, float *B, float *C, int m,
 
 double test_mkldnn_gemm_bf16bf16f32_transB_omp_cvt(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16)
 {
-    #pragma omp parallel for num_threads(24)
+    #pragma omp parallel for num_threads(omp_get_num_procs())
     for (int i = 0; i < m; ++i)
         mkldnn::impl::cvt_float_to_bfloat16(A_bf16+i*k, A+i*k, k);
     mkldnn_gemm_bf16bf16f32('N', 'T', m, n, k, 1.0, A_bf16, k, B_bf16, k, 0.0, C, n);
 
     auto tag_1 = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < 1000; ++i) {
-        #pragma omp parallel for num_threads(24)
+        #pragma omp parallel for num_threads(omp_get_num_procs())
         for (int i = 0; i < m; ++i)
             mkldnn::impl::cvt_float_to_bfloat16(A_bf16+i*k, A+i*k, k);
 	mkldnn_gemm_bf16bf16f32('N', 'T', m, n, k, 1.0, A_bf16, k, B_bf16, k, 0.0, C, n);
@@ -320,13 +320,13 @@ double test_mkldnn_cvt_float_to_bfloat16(float *A, float *B, float *C, int m, in
 
 double test_mkldnn_omp_cvt_float_to_bfloat16(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16)
 {
-    #pragma omp parallel for num_threads(24)
+    #pragma omp parallel for num_threads(omp_get_num_procs())
     for (int i = 0; i < m; ++i)
         mkldnn::impl::cvt_float_to_bfloat16(A_bf16+i*k, A+i*k, k);
 
     auto tag_1 = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < 1000; ++i) {
-        #pragma omp parallel for num_threads(24)
+        #pragma omp parallel for num_threads(omp_get_num_procs())
         for (int i = 0; i < m; ++i)
             mkldnn::impl::cvt_float_to_bfloat16(A_bf16+i*k, A+i*k, k);
     }
