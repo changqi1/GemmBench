@@ -33,6 +33,17 @@ make -j all
 make install
 cd ../../
 
+# build dnnl-v1.3 for CPX
+git clone https://github.com/intel/mkl-dnn.git dnnl-v1.3
+cd dnnl-v1.3/
+git checkout remotes/origin/rls-v1.3
+git apply --check ../patch_dnnl-v1.3.diff
+git apply ../patch_dnnl-v1.3.diff
+mkdir -p build && cd build && cmake -DCMAKE_INSTALL_PREFIX=../../local/dnnl-v1.3/ ..
+make -j all
+make install
+cd ../..
+
 # build xbyak
 git clone https://github.com/herumi/xbyak.git xbyak-v5.891
 cd xbyak-v5.891
