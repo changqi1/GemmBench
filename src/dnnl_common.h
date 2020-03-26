@@ -37,6 +37,10 @@ void del_dnnl(void)
       delete iter->second;
     }
 
+    for (map_mm_primd_t::iterator iter = g_mm_prim_desc.begin(); iter != g_mm_prim_desc.end(); ++iter) {
+      delete iter->second;
+    }
+
     for (map_prim_t::iterator iter = g_prim.begin(); iter != g_prim.end(); ++iter) {
       delete iter->second;
     }

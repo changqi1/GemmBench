@@ -16,7 +16,7 @@
 
 #include "dnnl_common.h"
 #include "dnnl_inner_product.h"
-
+#include "dnnl_matmul.h"
 
 void init_param(int m, int n, int k, float *A, float *B, float *C, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16, Eigen::MatrixXf& A_mat, Eigen::MatrixXf& B_mat, Eigen::MatrixXf& C_mat);
 
@@ -42,6 +42,13 @@ template <typename T_A, typename T_B, typename T_bias, typename T_C>
 double test_dnnl_inner_product_v2(engine eng, stream stm, T_A* A_buf, T_B* B_buf, T_bias* bias_buf, T_C* C_buf, int m, int n, int k);
 template <typename T_A, typename T_B, typename T_bias, typename T_C>
 double test_dnnl_inner_product_eltwise(engine eng, stream stm, T_A* A_buf, T_B* B_buf, T_bias* bias_buf, T_C* C_buf, int m, int n, int k);
+
+template <typename T_A, typename T_B, typename T_bias, typename T_C>
+double test_dnnl_matmul(engine eng, stream stm, T_A* A_buf, T_B* B_buf, T_bias* bias_buf, T_C* C_buf, int m, int n, int k);
+template <typename T_A, typename T_B, typename T_C>
+double test_dnnl_matmul2(engine eng, stream stm, T_A* A_buf, T_B* B_buf, T_C* C_buf, int m, int n, int k);
+template <typename T_A, typename T_B, typename T_C>
+double test_dnnl_matmul2_eltwise(engine eng, stream stm, T_A* A_buf, T_B* B_buf, T_C* C_buf, int m, int n, int k);
 
 
 int main(int argc, char *argv[])
@@ -108,6 +115,15 @@ int main(int argc, char *argv[])
     double t_dnnl_ip_bbbb  = test_dnnl_inner_product(cpu_engine, cpu_stream, A_bf16, B_bf16, bias_bf16, C_bf16, m, n, k);
     double t_dnnl_ip_bbbb_e= test_dnnl_inner_product_eltwise(cpu_engine, cpu_stream, A_bf16, B_bf16, bias_bf16, C_bf16, m, n, k);
     double t_dnnl_ip_bbbf  = test_dnnl_inner_product(cpu_engine, cpu_stream, A_bf16, B_bf16, bias_bf16, C, m, n, k);
+
+    double t_dnnl_mm_ffff  = test_dnnl_matmul(cpu_engine, cpu_stream, A, B, bias, C, m, n, k);
+    double t_dnnl_mm_bbbb  = test_dnnl_matmul(cpu_engine, cpu_stream, A_bf16, B_bf16, bias_bf16, C_bf16, m, n, k);
+    double t_dnnl_mm_bbbf  = test_dnnl_matmul(cpu_engine, cpu_stream, A_bf16, B_bf16, bias_bf16, C, m, n, k);
+    double t_dnnl_mm_fff  = test_dnnl_matmul2(cpu_engine, cpu_stream, A, B, C, m, n, k);
+    double t_dnnl_mm_bbb  = test_dnnl_matmul2(cpu_engine, cpu_stream, A_bf16, B_bf16, C_bf16, m, n, k);
+    double t_dnnl_mm_bbb_e= test_dnnl_matmul2_eltwise(cpu_engine, cpu_stream, A_bf16, B_bf16, C_bf16, m, n, k);
+    double t_dnnl_mm_bbf  = test_dnnl_matmul2(cpu_engine, cpu_stream, A_bf16, B_bf16, C, m, n, k);
+
     del_dnnl();
 
     printf("\n>> omp num_procs: %d\n", omp_get_num_procs());
@@ -127,7 +143,7 @@ int main(int argc, char *argv[])
     printf("dnnl cvt b2f:              \t%.6f \tt/bgemm:   %.3f%\n", t_dnnl_cvt_b2f,     t_dnnl_cvt_b2f/t_dnnl_gemm_bf16*100);
     printf("dnnl omp_cvt b2f:          \t%.6f \tt/bgemm:   %.3f%\n", t_dnnl_omp_cvt_b2f, t_dnnl_omp_cvt_b2f/t_dnnl_gemm_bf16*100);
 
-    printf(">> f: fp32, b: bf16, elw: eltwise\n");
+    printf(">> inner_product, f: fp32, b: bf16, elw: eltwise\n");
     printf("dnnl inner_product  ffff:     \t%.6f \t+%.3fX\n", t_dnnl_ip_ffff,   t_mkl_sgemm/t_dnnl_ip_ffff);
     printf("dnnl inner_product2 ffff:     \t%.6f \t+%.3fX\n", t_dnnl_ip2_ffff,  t_mkl_sgemm/t_dnnl_ip2_ffff);
     printf("dnnl inner_product2 fffb:     \t%.6f \t+%.3fX\n", t_dnnl_ip2_fffb,  t_mkl_sgemm/t_dnnl_ip2_fffb);
@@ -135,6 +151,15 @@ int main(int argc, char *argv[])
     printf("dnnl inner_product  bbbb:     \t%.6f \t+%.3fX\n", t_dnnl_ip_bbbb,   t_mkl_sgemm/t_dnnl_ip_bbbb);
     printf("dnnl inner_product  bbbb+elw: \t%.6f \t+%.3fX\n", t_dnnl_ip_bbbb_e, t_mkl_sgemm/t_dnnl_ip_bbbb_e);
     printf("dnnl inner_product  bbbf:     \t%.6f \t+%.3fX\n", t_dnnl_ip_bbbf,   t_mkl_sgemm/t_dnnl_ip_bbbf);
+
+    printf(">> matmul, f: fp32, b: bf16, elw: eltwise\n");
+    printf("dnnl matmul ffff:          \t%.6f \t+%.3fX\n", t_dnnl_mm_ffff,   t_mkl_sgemm/t_dnnl_mm_ffff);
+    printf("dnnl matmul bbbb:          \t%.6f \t+%.3fX\n", t_dnnl_mm_bbbb,   t_mkl_sgemm/t_dnnl_mm_bbbb);
+    printf("dnnl matmul bbbf:          \t%.6f \t+%.3fX\n", t_dnnl_mm_bbbf,   t_mkl_sgemm/t_dnnl_mm_bbbf);
+    printf("dnnl matmul2 fff:          \t%.6f \t+%.3fX\n", t_dnnl_mm_fff,   t_mkl_sgemm/t_dnnl_mm_fff);
+    printf("dnnl matmul2 bbb:          \t%.6f \t+%.3fX\n", t_dnnl_mm_bbb,   t_mkl_sgemm/t_dnnl_mm_bbb);
+    printf("dnnl matmul2 bbb+elw:      \t%.6f \t+%.3fX\n", t_dnnl_mm_bbb_e, t_mkl_sgemm/t_dnnl_mm_bbb_e);
+    printf("dnnl matmul2 bbf:          \t%.6f \t+%.3fX\n", t_dnnl_mm_bbf,   t_mkl_sgemm/t_dnnl_mm_bbf);
 
     delete[] A_bf16;
     delete[] B_bf16;
@@ -466,6 +491,57 @@ double test_dnnl_inner_product_eltwise(engine eng, stream stm, T_A* A_buf, T_B* 
     auto tag_1 = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < 1000; ++i) {
         InnerProduct_eltwise(eng, stm, A_buf, B_buf, bias_buf, C_buf, m, n, k);
+    }
+
+    auto tag_2 = std::chrono::high_resolution_clock::now();
+    auto tag_diff = std::chrono::duration<double>(tag_2 - tag_1).count();
+    std::cout << "result: " << C_buf[0] << "," << C_buf[m*n-1] << std::endl;
+
+    return tag_diff;
+}
+
+template <typename T_A, typename T_B, typename T_bias, typename T_C>
+double test_dnnl_matmul(engine eng, stream stm, T_A* A_buf, T_B* B_buf, T_bias* bias_buf, T_C* C_buf, int m, int n, int k)
+{
+    MatMul(eng, stm, A_buf, B_buf, bias_buf, C_buf, m, n, k);
+
+    auto tag_1 = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < 1000; ++i) {
+        MatMul(eng, stm, A_buf, B_buf, bias_buf, C_buf, m, n, k);
+    }
+
+    auto tag_2 = std::chrono::high_resolution_clock::now();
+    auto tag_diff = std::chrono::duration<double>(tag_2 - tag_1).count();
+    std::cout << "result: " << C_buf[0] << "," << C_buf[m*n-1] << std::endl;
+
+    return tag_diff;
+}
+
+template <typename T_A, typename T_B, typename T_C>
+double test_dnnl_matmul2(engine eng, stream stm, T_A* A_buf, T_B* B_buf, T_C* C_buf, int m, int n, int k)
+{
+    MatMul2(eng, stm, A_buf, B_buf, C_buf, m, n, k);
+
+    auto tag_1 = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < 1000; ++i) {
+        MatMul2(eng, stm, A_buf, B_buf, C_buf, m, n, k);
+    }
+
+    auto tag_2 = std::chrono::high_resolution_clock::now();
+    auto tag_diff = std::chrono::duration<double>(tag_2 - tag_1).count();
+    std::cout << "result: " << C_buf[0] << "," << C_buf[m*n-1] << std::endl;
+
+    return tag_diff;
+}
+
+template <typename T_A, typename T_B, typename T_C>
+double test_dnnl_matmul2_eltwise(engine eng, stream stm, T_A* A_buf, T_B* B_buf, T_C* C_buf, int m, int n, int k)
+{
+    MatMul2_eltwise(eng, stm, A_buf, B_buf, C_buf, m, n, k);
+
+    auto tag_1 = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < 1000; ++i) {
+        MatMul2_eltwise(eng, stm, A_buf, B_buf, C_buf, m, n, k);
     }
 
     auto tag_2 = std::chrono::high_resolution_clock::now();
