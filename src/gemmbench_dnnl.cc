@@ -108,8 +108,8 @@ int main(int argc, char *argv[])
     double t_dnnl_ip2_fffb = test_dnnl_inner_product_v2(cpu_engine, cpu_stream, A, B, bias, C_bf16, m, n, k);
     double t_dnnl_ip2_fbbb = test_dnnl_inner_product_v2(cpu_engine, cpu_stream, A, B_bf16, bias_bf16, C_bf16, m, n, k);
     double t_dnnl_ip_bbbb  = test_dnnl_inner_product(cpu_engine, cpu_stream, A_bf16, B_bf16, bias_bf16, C_bf16, m, n, k);
+    double t_dnnl_ip_bbbb_e= test_dnnl_inner_product_eltwise(cpu_engine, cpu_stream, A_bf16, B_bf16, bias_bf16, C_bf16, m, n, k);
     double t_dnnl_ip_bbbf  = test_dnnl_inner_product(cpu_engine, cpu_stream, A_bf16, B_bf16, bias_bf16, C, m, n, k);
-    double t_dnnl_ip_bbbb_e = test_dnnl_inner_product_eltwise(cpu_engine, cpu_stream, A_bf16, B_bf16, bias_bf16, C_bf16, m, n, k);
     del_dnnl();
 
     printf("\n>> omp num_procs: %d\n", omp_get_num_procs());

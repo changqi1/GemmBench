@@ -10,7 +10,6 @@
 
 ```shell
 $ ./run_dnnl.sh 128 768 768
-./run_dnnl.sh 128 768 768
 Core number: 24
 cpus: 24-47
 ./gemmbench_dnnl m n k
@@ -52,10 +51,10 @@ InnerProduct: reorder user_src_memory !!!
 result: 932,932
 InnerProduct: save prim_key = InnerProduct-bbbb-128-768-768-0x7f4252acf010, prim number = 5
 result: 932,932
-InnerProduct: save prim_key = InnerProduct-bbbf-128-768-768-0x7f4252acf010, prim number = 6
-result: 933.023,933.023
-InnerProduct: save prim_key = InnerProductEltwise-bbbb-128-768-768-0x7f4252acf010, prim number = 7
+InnerProduct: save prim_key = InnerProductEltwise-bbbb-128-768-768-0x7f4252acf010, prim number = 6
 result: 932,932
+InnerProduct: save prim_key = InnerProduct-bbbf-128-768-768-0x7f4252acf010, prim number = 7
+result: 933.023,933.023
 
 >> omp num_procs: 24
 eigen sgemm:                    0.326602
@@ -88,8 +87,9 @@ dnnl inner_product  bbbf:       0.056434        +1.968X
 
 ```shell
 >> src(N,IC) × weights(OC,IC) + bias(OC) = dst(N,OC)
->> 以上表示的是2维的 tensor，当输入为4维 tensor, src(N,IC′,IH,IW), weights(OC,IC′,KH,KW) 时，可以定义 IC=IC′*IH*IW，并且需要 KH=IH，KW=IW。
->> 只需要修改 memory::dims user memory::desc 的 format_tag
+>> 以上表示的是2维的 tensor，当输入为4维 tensor, src(N,IC′,IH,IW), weights(OC,IC′,KH,KW) 时，
+>> 可以定义 IC=IC′*IH*IW，并且需要 KH=IH，KW=IW,
+>> 只需要修改 memory::dims user memory::desc 的 format_tag。
 >> forward post-op 支持 eltwise
 ```
 
