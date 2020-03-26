@@ -14,9 +14,9 @@
 //#define XBYAK_NO_OP_NAMES
 //#include <xbyak.h>
 
+#include "dnnl_common.h"
 #include "dnnl_inner_product.h"
 
-typedef dnnl::impl::bfloat16_t bfloat16;
 
 void init_param(int m, int n, int k, float *A, float *B, float *C, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16, Eigen::MatrixXf& A_mat, Eigen::MatrixXf& B_mat, Eigen::MatrixXf& C_mat);
 
@@ -43,8 +43,6 @@ double test_dnnl_inner_product_v2(engine eng, stream stm, T_A* A_buf, T_B* B_buf
 template <typename T_A, typename T_B, typename T_bias, typename T_C>
 double test_dnnl_inner_product_eltwise(engine eng, stream stm, T_A* A_buf, T_B* B_buf, T_bias* bias_buf, T_C* C_buf, int m, int n, int k);
 
-
-using namespace dnnl;
 
 int main(int argc, char *argv[])
 {

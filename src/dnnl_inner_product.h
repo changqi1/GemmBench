@@ -1,31 +1,10 @@
 #ifndef __DNNL_INNER_PRODUCT__
 #define __DNNL_INNER_PRODUCT__
 
-#include "dnnl.hpp"
-#include "dnnl_debug.h"
-#include "bfloat16.hpp"
-
-#include <iostream>
-#include <string>
-#include <sstream>
-#include <iomanip>
-#include <chrono>
-
-using namespace dnnl;
-
-typedef dnnl::impl::bfloat16_t bfloat16;
-
-typedef std::unordered_map<std::string, memory*> map_mem_t;
-typedef std::unordered_map<std::string, inner_product_forward::primitive_desc*> map_primd_t;
-typedef std::unordered_map<std::string, primitive*> map_prim_t;
-
-engine eng(engine::kind::cpu, 0);
-map_mem_t g_memory;
-map_primd_t g_prim_desc;
-map_prim_t g_prim;
+#include "dnnl_common.h"
 
 template <typename T_input, typename T_wei, typename T_bias, typename T_output>
-extern bool InnerProduct(engine eng, stream stm, T_input* input, T_wei* weight, T_bias* bias, T_output* output, int m, int n, int k)
+bool InnerProduct(engine eng, stream stm, T_input* input, T_wei* weight, T_bias* bias, T_output* output, int m, int n, int k)
 {
     char type_input = (std::is_floating_point<T_input>::value) ? 'f' : 'b';
     char type_weights = (std::is_floating_point<T_wei>::value) ? 'f' : 'b';
@@ -64,7 +43,7 @@ extern bool InnerProduct(engine eng, stream stm, T_input* input, T_wei* weight, 
         auto *prim = new inner_product_forward(*prim_desc);
 
         g_prim.insert(std::pair<std::string, primitive *>(prim_key, prim));
-        g_prim_desc.insert(std::pair<std::string, inner_product_forward::primitive_desc *>(prim_key, prim_desc));
+        g_ip_prim_desc.insert(std::pair<std::string, inner_product_forward::primitive_desc *>(prim_key, prim_desc));
         std::cout << "InnerProduct: save prim_key = " << prim_key << ", prim number = " << g_prim.size() << std::endl;
     }
 
@@ -76,9 +55,9 @@ extern bool InnerProduct(engine eng, stream stm, T_input* input, T_wei* weight, 
     auto user_weights_memory = memory(user_weights_md, eng, weight);
     auto user_bias_memory = memory(user_bias_md, eng, bias);
 
-    auto it_prim_desc_created = g_prim_desc.find(prim_key);
-    if (it_prim_desc_created == g_prim_desc.end()) {
-        std::cout << "InnerProduct error: can find g_prim_desc = " << prim_key << std::endl;
+    auto it_prim_desc_created = g_ip_prim_desc.find(prim_key);
+    if (it_prim_desc_created == g_ip_prim_desc.end()) {
+        std::cout << "InnerProduct error: can find g_ip_prim_desc = " << prim_key << std::endl;
         return false;
     }
     inner_product_forward::primitive_desc prim_desc = *it_prim_desc_created->second;
@@ -150,7 +129,7 @@ extern bool InnerProduct(engine eng, stream stm, T_input* input, T_wei* weight, 
 }
 
 template <typename T_input, typename T_wei, typename T_bias, typename T_output>
-extern bool InnerProduct_v2(engine eng, stream stm, T_input* input, T_wei* weight, T_bias* bias, T_output* output, int m, int n, int k)
+bool InnerProduct_v2(engine eng, stream stm, T_input* input, T_wei* weight, T_bias* bias, T_output* output, int m, int n, int k)
 {
     char type_input = (std::is_floating_point<T_input>::value) ? 'f' : 'b';
     char type_weights = (std::is_floating_point<T_wei>::value) ? 'f' : 'b';
@@ -189,7 +168,7 @@ extern bool InnerProduct_v2(engine eng, stream stm, T_input* input, T_wei* weigh
         auto *prim = new inner_product_forward(*prim_desc);
 
         g_prim.insert(std::pair<std::string, primitive *>(prim_key, prim));
-        g_prim_desc.insert(std::pair<std::string, inner_product_forward::primitive_desc *>(prim_key, prim_desc));
+        g_ip_prim_desc.insert(std::pair<std::string, inner_product_forward::primitive_desc *>(prim_key, prim_desc));
         std::cout << "InnerProduct: save prim_key = " << prim_key << ", prim number = " << g_prim.size() << std::endl;
     }
 
@@ -201,9 +180,9 @@ extern bool InnerProduct_v2(engine eng, stream stm, T_input* input, T_wei* weigh
     auto user_weights_memory = memory(user_weights_md, eng, weight);
     auto user_bias_memory = memory(user_bias_md, eng, bias);
 
-    auto it_prim_desc_created = g_prim_desc.find(prim_key);
-    if (it_prim_desc_created == g_prim_desc.end()) {
-        std::cout << "InnerProduct error: can find g_prim_desc = " << prim_key << std::endl;
+    auto it_prim_desc_created = g_ip_prim_desc.find(prim_key);
+    if (it_prim_desc_created == g_ip_prim_desc.end()) {
+        std::cout << "InnerProduct error: can find g_ip_prim_desc = " << prim_key << std::endl;
         return false;
     }
     inner_product_forward::primitive_desc prim_desc = *it_prim_desc_created->second;
@@ -276,7 +255,7 @@ extern bool InnerProduct_v2(engine eng, stream stm, T_input* input, T_wei* weigh
 }
 
 template <typename T_input, typename T_wei, typename T_bias, typename T_output>
-extern bool InnerProduct_eltwise(engine eng, stream stm, T_input* input, T_wei* weight, T_bias* bias, T_output* output, int m, int n, int k)
+bool InnerProduct_eltwise(engine eng, stream stm, T_input* input, T_wei* weight, T_bias* bias, T_output* output, int m, int n, int k)
 {
     char type_input = (std::is_floating_point<T_input>::value) ? 'f' : 'b';
     char type_weights = (std::is_floating_point<T_wei>::value) ? 'f' : 'b';
@@ -324,7 +303,7 @@ extern bool InnerProduct_eltwise(engine eng, stream stm, T_input* input, T_wei* 
         auto *prim = new inner_product_forward(*prim_desc);
 
         g_prim.insert(std::pair<std::string, primitive *>(prim_key, prim));
-        g_prim_desc.insert(std::pair<std::string, inner_product_forward::primitive_desc *>(prim_key, prim_desc));
+        g_ip_prim_desc.insert(std::pair<std::string, inner_product_forward::primitive_desc *>(prim_key, prim_desc));
         std::cout << "InnerProduct: save prim_key = " << prim_key << ", prim number = " << g_prim.size() << std::endl;
     }
 
@@ -336,9 +315,9 @@ extern bool InnerProduct_eltwise(engine eng, stream stm, T_input* input, T_wei* 
     auto user_weights_memory = memory(user_weights_md, eng, weight);
     auto user_bias_memory = memory(user_bias_md, eng, bias);
 
-    auto it_prim_desc_created = g_prim_desc.find(prim_key);
-    if (it_prim_desc_created == g_prim_desc.end()) {
-        std::cout << "InnerProduct error: can find g_prim_desc = " << prim_key << std::endl;
+    auto it_prim_desc_created = g_ip_prim_desc.find(prim_key);
+    if (it_prim_desc_created == g_ip_prim_desc.end()) {
+        std::cout << "InnerProduct error: can find g_ip_prim_desc = " << prim_key << std::endl;
         return false;
     }
     inner_product_forward::primitive_desc prim_desc = *it_prim_desc_created->second;
@@ -408,21 +387,6 @@ extern bool InnerProduct_eltwise(engine eng, stream stm, T_input* input, T_wei* 
         return false;
     }
     stm.wait();
-}
-
-extern void del_dnnl(void)
-{
-    for (map_mem_t::iterator iter = g_memory.begin(); iter != g_memory.end(); ++iter) {
-      delete iter->second;
-    }
-
-    for (map_primd_t::iterator iter = g_prim_desc.begin(); iter != g_prim_desc.end(); ++iter) {
-      delete iter->second;
-    }
-
-    for (map_prim_t::iterator iter = g_prim.begin(); iter != g_prim.end(); ++iter) {
-      delete iter->second;
-    }
 }
 
 #endif
