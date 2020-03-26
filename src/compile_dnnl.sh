@@ -8,4 +8,4 @@ source /opt/intel/mkl/bin/mklvars.sh intel64
 ld_path=`pwd`/../
 export LD_LIBRARY_PATH=$ld_path/local/dnnl-v1.3/lib64:$LD_LIBRARY_PATH
 
-g++ -std=c++11 gemmbench_dnnl.cc -o gemmbench_dnnl -O2 -fopenmp -liomp5 -xCORE-AVX512 -lmkl_rt -I$MKLDNN_CFLAGS -L$MKLDNN_LFLAGS -ldnnl -I../local/eigen-v3.3.7/include/eigen3/ -I../local/xbyak-v5.891
+g++ -std=c++11 gemmbench_dnnl.cc dnnl_inner_product.h -o gemmbench_dnnl -O2 -fopenmp -liomp5 -xCORE-AVX512 -lmkl_rt -I$MKLDNN_CFLAGS -L$MKLDNN_LFLAGS -ldnnl -I../local/eigen-v3.3.7/include/eigen3/ -I../local/xbyak-v5.891

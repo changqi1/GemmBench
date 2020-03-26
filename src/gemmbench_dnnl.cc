@@ -1,6 +1,6 @@
 #include "dnnl.hpp"
-#include "bfloat16.hpp"
 #include "dnnl_debug.h"
+#include "bfloat16.hpp"
 
 #include "dnnl.h"
 
@@ -13,6 +13,8 @@
 
 //#define XBYAK_NO_OP_NAMES
 //#include <xbyak.h>
+
+#include "dnnl_inner_product.h"
 
 typedef dnnl::impl::bfloat16_t bfloat16;
 
@@ -31,6 +33,13 @@ double test_dnnl_gemm_bf16bf16f32_transB_omp_cvt(float *A, float *B, float *C, i
 double test_dnnl_cvt_float_to_bfloat16(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16);
 double test_dnnl_omp_cvt_float_to_bfloat16(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16);
 //double test_jit_cvt_float_to_bfloat16(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16);
+
+template <typename T_A, typename T_B, typename T_bias, typename T_C>
+double test_dnnl_inner_product(engine eng, stream stm, T_A* A_buf, T_B* B_buf, T_bias* bias_buf, T_C* C_buf, int m, int n, int k);
+template <typename T_A, typename T_B, typename T_bias, typename T_C>
+double test_dnnl_inner_product_v2(engine eng, stream stm, T_A* A_buf, T_B* B_buf, T_bias* bias_buf, T_C* C_buf, int m, int n, int k);
+
+using namespace dnnl;
 
 int main(int argc, char *argv[])
 {
@@ -73,10 +82,32 @@ int main(int argc, char *argv[])
     double t_dnnl_omp_cvt = test_dnnl_omp_cvt_float_to_bfloat16(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
     //double t_dnnl_jit_cvt = test_jit_cvt_float_to_bfloat16(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
 
+    engine cpu_engine;
+    stream cpu_stream;
+
+    stream stream(eng);
+    cpu_engine = eng;
+    cpu_stream = stream;
+
+    float *bias = new float[n];
+    bfloat16 *bias_bf16 = new bfloat16[n];
+    for (int i = 0; i < n; ++i) {
+        bias[i] = 1.1;
+        bias_bf16[i] = (bfloat16)1.1;
+    }
+
+    double t_dnnl_ip_ffff  = test_dnnl_inner_product(cpu_engine, cpu_stream, A, B, bias, C, m, n, k);
+    double t_dnnl_ip2_ffff = test_dnnl_inner_product_v2(cpu_engine, cpu_stream, A, B, bias, C, m, n, k);
+    double t_dnnl_ip2_fffb = test_dnnl_inner_product_v2(cpu_engine, cpu_stream, A, B, bias, C_bf16, m, n, k);
+    double t_dnnl_ip2_fbbb = test_dnnl_inner_product_v2(cpu_engine, cpu_stream, A, B_bf16, bias_bf16, C_bf16, m, n, k);
+    double t_dnnl_ip_bbbb  = test_dnnl_inner_product(cpu_engine, cpu_stream, A_bf16, B_bf16, bias_bf16, C_bf16, m, n, k);
+    double t_dnnl_ip_bbbf  = test_dnnl_inner_product(cpu_engine, cpu_stream, A_bf16, B_bf16, bias_bf16, C, m, n, k);
+    del_dnnl();
+
     printf("\n>> omp num_procs: %d\n", omp_get_num_procs());
-    printf("eigen gemm: \t%.6f\n", t_eigen_sgemm);
-    printf("mkl sgemm: \t%.6f ms --> baseline\n", t_mkl_sgemm);
-    printf("mkl sgemm+transB:            \t%.6f \t+%.3fX\n", t_mkl_sgemm_tB,                t_mkl_sgemm/t_mkl_sgemm_tB);
+    printf("eigen sgemm:               \t%.6f\n", t_eigen_sgemm);
+    printf("mkl sgemm:                 \t%.6f ms --> baseline\n", t_mkl_sgemm);
+    printf("mkl sgemm+transB:          \t%.6f \t+%.3fX\n", t_mkl_sgemm_tB,              t_mkl_sgemm/t_mkl_sgemm_tB);
     printf("dnnl sgemm:                \t%.6f \t+%.3fX\n", t_dnnl_sgemm,                t_mkl_sgemm/t_dnnl_sgemm);
     printf("dnnl bgemm:                \t%.6f \t+%.3fX\n", t_dnnl_gemm_bf16,            t_mkl_sgemm/t_dnnl_gemm_bf16);
     printf("dnnl bgemm+transB:         \t%.6f \t+%.3fX\n", t_dnnl_gemm_bf16_tB,         t_mkl_sgemm/t_dnnl_gemm_bf16_tB);
@@ -84,13 +115,22 @@ int main(int argc, char *argv[])
     printf("dnnl bgemm+transB+cvt:     \t%.6f \t+%.3fX\n", t_dnnl_gemm_bf16_tB_cvt,     t_mkl_sgemm/t_dnnl_gemm_bf16_tB_cvt);
     printf("dnnl bgemm+omp_cvt:        \t%.6f \t+%.3fX\n", t_dnnl_gemm_bf16_omp_cvt,    t_mkl_sgemm/t_dnnl_gemm_bf16_omp_cvt);
     printf("dnnl bgemm+transB+omp_cvt: \t%.6f \t+%.3fX\n", t_dnnl_gemm_bf16_tB_omp_cvt, t_mkl_sgemm/t_dnnl_gemm_bf16_tB_omp_cvt);
-    printf("dnnl cvt:     \t%.6f \tt/bgemm:   %.3f%\n", t_dnnl_cvt,     t_dnnl_cvt/t_dnnl_gemm_bf16*100);
-    printf("dnnl omp_cvt: \t%.6f \tt/bgemm:   %.3f%\n", t_dnnl_omp_cvt, t_dnnl_omp_cvt/t_dnnl_gemm_bf16*100);
+    printf("dnnl cvt:                  \t%.6f \tt/bgemm:   %.3f%\n", t_dnnl_cvt,     t_dnnl_cvt/t_dnnl_gemm_bf16*100);
+    printf("dnnl omp_cvt:              \t%.6f \tt/bgemm:   %.3f%\n", t_dnnl_omp_cvt, t_dnnl_omp_cvt/t_dnnl_gemm_bf16*100);
     //printf("dnnl jit_cvt: \t%.6f \tt/bgemm:   %.3f%\n", t_dnnl_jit_cvt, t_dnnl_jit_cvt/t_dnnl_gemm_bf16*100);
+
+    printf(">> f: fp32, b: bf16\n");
+    printf("dnnl inner_product  ffff:   \t%.6f \t+%.3fX\n", t_dnnl_ip_ffff,  t_mkl_sgemm/t_dnnl_ip_ffff);
+    printf("dnnl inner_product2 ffff:   \t%.6f \t+%.3fX\n", t_dnnl_ip2_ffff, t_mkl_sgemm/t_dnnl_ip2_ffff);
+    printf("dnnl inner_product2 fffb:   \t%.6f \t+%.3fX\n", t_dnnl_ip2_fffb, t_mkl_sgemm/t_dnnl_ip2_fffb);
+    printf("dnnl inner_product2 fbbb:   \t%.6f \t+%.3fX\n", t_dnnl_ip2_fbbb, t_mkl_sgemm/t_dnnl_ip2_fbbb);
+    printf("dnnl inner_product  bbbb:   \t%.6f \t+%.3fX\n", t_dnnl_ip_bbbb,  t_mkl_sgemm/t_dnnl_ip_bbbb);
+    printf("dnnl inner_product  bbbf:   \t%.6f \t+%.3fX\n", t_dnnl_ip_bbbf,  t_mkl_sgemm/t_dnnl_ip_bbbf);
 
     delete[] A_bf16;
     delete[] B_bf16;
     delete[] C_bf16;
+    delete[] bias_bf16;
 
     delete[] A;
     delete[] B;
@@ -334,6 +374,41 @@ double test_dnnl_omp_cvt_float_to_bfloat16(float *A, float *B, float *C, int m, 
     auto tag_2 = std::chrono::high_resolution_clock::now();
     auto tag_diff = std::chrono::duration<double>(tag_2 - tag_1).count();
     std::cout << "result: " << C[0] << "," << C[m*n-1] << std::endl;
+
+    return tag_diff;
+}
+
+template <typename T_A, typename T_B, typename T_bias, typename T_C>
+double test_dnnl_inner_product(engine eng, stream stm, T_A* A_buf, T_B* B_buf, T_bias* bias_buf, T_C* C_buf, int m, int n, int k)
+{
+    InnerProduct(eng, stm, A_buf, B_buf, bias_buf, C_buf, m, n, k);
+
+    auto tag_1 = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < 1000; ++i) {
+        InnerProduct(eng, stm, A_buf, B_buf, bias_buf, C_buf, m, n, k);
+    }
+
+    auto tag_2 = std::chrono::high_resolution_clock::now();
+    auto tag_diff = std::chrono::duration<double>(tag_2 - tag_1).count();
+    std::cout << "result: " << (float)C_buf[0] << "," << (float)C_buf[m*n-1] << std::endl;
+
+    return tag_diff;
+}
+
+template <typename T_A, typename T_B, typename T_bias, typename T_C>
+double test_dnnl_inner_product_v2(engine eng, stream stm, T_A* A_buf, T_B* B_buf, T_bias* bias_buf, T_C* C_buf, int m, int n, int k)
+{
+    InnerProduct_v2(eng, stm, A_buf, B_buf, bias_buf, C_buf, m, n, k);
+
+    auto tag_1 = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < 1000; ++i) {
+        InnerProduct_v2(eng, stm, A_buf, B_buf, bias_buf, C_buf, m, n, k);
+    }
+
+    auto tag_2 = std::chrono::high_resolution_clock::now();
+    auto tag_diff = std::chrono::duration<double>(tag_2 - tag_1).count();
+    std::cout << "result: " << C_buf[0] << "," << C_buf[m*n-1] << std::endl;
+    // std::cout << "result: " << (bfloat16)933.023 << std::endl;
 
     return tag_diff;
 }
