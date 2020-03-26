@@ -33,6 +33,8 @@ double test_dnnl_gemm_bf16bf16f32_transB_omp_cvt(float *A, float *B, float *C, i
 double test_dnnl_cvt_float_to_bfloat16(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16);
 double test_dnnl_omp_cvt_float_to_bfloat16(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16);
 //double test_jit_cvt_float_to_bfloat16(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16);
+double test_dnnl_cvt_bfloat16_to_float(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16);
+double test_dnnl_omp_cvt_bfloat16_to_float(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16);
 
 template <typename T_A, typename T_B, typename T_bias, typename T_C>
 double test_dnnl_inner_product(engine eng, stream stm, T_A* A_buf, T_B* B_buf, T_bias* bias_buf, T_C* C_buf, int m, int n, int k);
@@ -78,9 +80,11 @@ int main(int argc, char *argv[])
     double t_dnnl_gemm_bf16_tB_cvt = test_dnnl_gemm_bf16bf16f32_transB_cvt(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
     double t_dnnl_gemm_bf16_omp_cvt = test_dnnl_gemm_bf16bf16f32_omp_cvt(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
     double t_dnnl_gemm_bf16_tB_omp_cvt = test_dnnl_gemm_bf16bf16f32_transB_omp_cvt(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
-    double t_dnnl_cvt     = test_dnnl_cvt_float_to_bfloat16(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
-    double t_dnnl_omp_cvt = test_dnnl_omp_cvt_float_to_bfloat16(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
+    double t_dnnl_cvt_f2b     = test_dnnl_cvt_float_to_bfloat16(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
+    double t_dnnl_omp_cvt_f2b = test_dnnl_omp_cvt_float_to_bfloat16(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
     //double t_dnnl_jit_cvt = test_jit_cvt_float_to_bfloat16(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
+    double t_dnnl_cvt_b2f     = test_dnnl_cvt_bfloat16_to_float(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
+    double t_dnnl_omp_cvt_b2f = test_dnnl_omp_cvt_bfloat16_to_float(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
 
     engine cpu_engine;
     stream cpu_stream;
@@ -115,9 +119,11 @@ int main(int argc, char *argv[])
     printf("dnnl bgemm+transB+cvt:     \t%.6f \t+%.3fX\n", t_dnnl_gemm_bf16_tB_cvt,     t_mkl_sgemm/t_dnnl_gemm_bf16_tB_cvt);
     printf("dnnl bgemm+omp_cvt:        \t%.6f \t+%.3fX\n", t_dnnl_gemm_bf16_omp_cvt,    t_mkl_sgemm/t_dnnl_gemm_bf16_omp_cvt);
     printf("dnnl bgemm+transB+omp_cvt: \t%.6f \t+%.3fX\n", t_dnnl_gemm_bf16_tB_omp_cvt, t_mkl_sgemm/t_dnnl_gemm_bf16_tB_omp_cvt);
-    printf("dnnl cvt:                  \t%.6f \tt/bgemm:   %.3f%\n", t_dnnl_cvt,     t_dnnl_cvt/t_dnnl_gemm_bf16*100);
-    printf("dnnl omp_cvt:              \t%.6f \tt/bgemm:   %.3f%\n", t_dnnl_omp_cvt, t_dnnl_omp_cvt/t_dnnl_gemm_bf16*100);
+    printf("dnnl cvt f2b:              \t%.6f \tt/bgemm:   %.3f%\n", t_dnnl_cvt_f2b,     t_dnnl_cvt_f2b/t_dnnl_gemm_bf16*100);
+    printf("dnnl omp_cvt f2b:          \t%.6f \tt/bgemm:   %.3f%\n", t_dnnl_omp_cvt_f2b, t_dnnl_omp_cvt_f2b/t_dnnl_gemm_bf16*100);
     //printf("dnnl jit_cvt: \t%.6f \tt/bgemm:   %.3f%\n", t_dnnl_jit_cvt, t_dnnl_jit_cvt/t_dnnl_gemm_bf16*100);
+    printf("dnnl cvt b2f:              \t%.6f \tt/bgemm:   %.3f%\n", t_dnnl_cvt_b2f,     t_dnnl_cvt_b2f/t_dnnl_gemm_bf16*100);
+    printf("dnnl omp_cvt b2f:          \t%.6f \tt/bgemm:   %.3f%\n", t_dnnl_omp_cvt_b2f, t_dnnl_omp_cvt_b2f/t_dnnl_gemm_bf16*100);
 
     printf(">> f: fp32, b: bf16\n");
     printf("dnnl inner_product  ffff:   \t%.6f \t+%.3fX\n", t_dnnl_ip_ffff,  t_mkl_sgemm/t_dnnl_ip_ffff);
@@ -369,6 +375,42 @@ double test_dnnl_omp_cvt_float_to_bfloat16(float *A, float *B, float *C, int m, 
         #pragma omp parallel for num_threads(omp_get_num_procs())
         for (int i = 0; i < m; ++i)
             dnnl::impl::cvt_float_to_bfloat16(A_bf16+i*k, A+i*k, k);
+    }
+
+    auto tag_2 = std::chrono::high_resolution_clock::now();
+    auto tag_diff = std::chrono::duration<double>(tag_2 - tag_1).count();
+    std::cout << "result: " << C[0] << "," << C[m*n-1] << std::endl;
+
+    return tag_diff;
+}
+
+double test_dnnl_cvt_bfloat16_to_float(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16)
+{
+    dnnl::impl::cvt_bfloat16_to_float(A, A_bf16, m*k);
+
+    auto tag_1 = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < 1000; ++i) {
+        dnnl::impl::cvt_bfloat16_to_float(A, A_bf16, m*k);
+    }
+
+    auto tag_2 = std::chrono::high_resolution_clock::now();
+    auto tag_diff = std::chrono::duration<double>(tag_2 - tag_1).count();
+    std::cout << "result: " << C[0] << "," << C[m*n-1] << std::endl;
+
+    return tag_diff;
+}
+
+double test_dnnl_omp_cvt_bfloat16_to_float(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16)
+{
+    #pragma omp parallel for num_threads(omp_get_num_procs())
+    for (int i = 0; i < m; ++i)
+        dnnl::impl::cvt_bfloat16_to_float(A+i*k, A_bf16+i*k, k);
+
+    auto tag_1 = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < 1000; ++i) {
+        #pragma omp parallel for num_threads(omp_get_num_procs())
+        for (int i = 0; i < m; ++i)
+            dnnl::impl::cvt_bfloat16_to_float(A+i*k, A_bf16+i*k, k);
     }
 
     auto tag_2 = std::chrono::high_resolution_clock::now();
