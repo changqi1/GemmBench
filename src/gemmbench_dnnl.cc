@@ -40,6 +40,9 @@ template <typename T_A, typename T_B, typename T_bias, typename T_C>
 double test_dnnl_inner_product(engine eng, stream stm, T_A* A_buf, T_B* B_buf, T_bias* bias_buf, T_C* C_buf, int m, int n, int k);
 template <typename T_A, typename T_B, typename T_bias, typename T_C>
 double test_dnnl_inner_product_v2(engine eng, stream stm, T_A* A_buf, T_B* B_buf, T_bias* bias_buf, T_C* C_buf, int m, int n, int k);
+template <typename T_A, typename T_B, typename T_bias, typename T_C>
+double test_dnnl_inner_product_eltwise(engine eng, stream stm, T_A* A_buf, T_B* B_buf, T_bias* bias_buf, T_C* C_buf, int m, int n, int k);
+
 
 using namespace dnnl;
 
@@ -106,6 +109,7 @@ int main(int argc, char *argv[])
     double t_dnnl_ip2_fbbb = test_dnnl_inner_product_v2(cpu_engine, cpu_stream, A, B_bf16, bias_bf16, C_bf16, m, n, k);
     double t_dnnl_ip_bbbb  = test_dnnl_inner_product(cpu_engine, cpu_stream, A_bf16, B_bf16, bias_bf16, C_bf16, m, n, k);
     double t_dnnl_ip_bbbf  = test_dnnl_inner_product(cpu_engine, cpu_stream, A_bf16, B_bf16, bias_bf16, C, m, n, k);
+    double t_dnnl_ip_bbbb_e = test_dnnl_inner_product_eltwise(cpu_engine, cpu_stream, A_bf16, B_bf16, bias_bf16, C_bf16, m, n, k);
     del_dnnl();
 
     printf("\n>> omp num_procs: %d\n", omp_get_num_procs());
@@ -125,13 +129,14 @@ int main(int argc, char *argv[])
     printf("dnnl cvt b2f:              \t%.6f \tt/bgemm:   %.3f%\n", t_dnnl_cvt_b2f,     t_dnnl_cvt_b2f/t_dnnl_gemm_bf16*100);
     printf("dnnl omp_cvt b2f:          \t%.6f \tt/bgemm:   %.3f%\n", t_dnnl_omp_cvt_b2f, t_dnnl_omp_cvt_b2f/t_dnnl_gemm_bf16*100);
 
-    printf(">> f: fp32, b: bf16\n");
-    printf("dnnl inner_product  ffff:   \t%.6f \t+%.3fX\n", t_dnnl_ip_ffff,  t_mkl_sgemm/t_dnnl_ip_ffff);
-    printf("dnnl inner_product2 ffff:   \t%.6f \t+%.3fX\n", t_dnnl_ip2_ffff, t_mkl_sgemm/t_dnnl_ip2_ffff);
-    printf("dnnl inner_product2 fffb:   \t%.6f \t+%.3fX\n", t_dnnl_ip2_fffb, t_mkl_sgemm/t_dnnl_ip2_fffb);
-    printf("dnnl inner_product2 fbbb:   \t%.6f \t+%.3fX\n", t_dnnl_ip2_fbbb, t_mkl_sgemm/t_dnnl_ip2_fbbb);
-    printf("dnnl inner_product  bbbb:   \t%.6f \t+%.3fX\n", t_dnnl_ip_bbbb,  t_mkl_sgemm/t_dnnl_ip_bbbb);
-    printf("dnnl inner_product  bbbf:   \t%.6f \t+%.3fX\n", t_dnnl_ip_bbbf,  t_mkl_sgemm/t_dnnl_ip_bbbf);
+    printf(">> f: fp32, b: bf16, elw: eltwise\n");
+    printf("dnnl inner_product  ffff:     \t%.6f \t+%.3fX\n", t_dnnl_ip_ffff,   t_mkl_sgemm/t_dnnl_ip_ffff);
+    printf("dnnl inner_product2 ffff:     \t%.6f \t+%.3fX\n", t_dnnl_ip2_ffff,  t_mkl_sgemm/t_dnnl_ip2_ffff);
+    printf("dnnl inner_product2 fffb:     \t%.6f \t+%.3fX\n", t_dnnl_ip2_fffb,  t_mkl_sgemm/t_dnnl_ip2_fffb);
+    printf("dnnl inner_product2 fbbb:     \t%.6f \t+%.3fX\n", t_dnnl_ip2_fbbb,  t_mkl_sgemm/t_dnnl_ip2_fbbb);
+    printf("dnnl inner_product  bbbb:     \t%.6f \t+%.3fX\n", t_dnnl_ip_bbbb,   t_mkl_sgemm/t_dnnl_ip_bbbb);
+    printf("dnnl inner_product  bbbb+elw: \t%.6f \t+%.3fX\n", t_dnnl_ip_bbbb_e, t_mkl_sgemm/t_dnnl_ip_bbbb_e);
+    printf("dnnl inner_product  bbbf:     \t%.6f \t+%.3fX\n", t_dnnl_ip_bbbf,   t_mkl_sgemm/t_dnnl_ip_bbbf);
 
     delete[] A_bf16;
     delete[] B_bf16;
@@ -432,7 +437,7 @@ double test_dnnl_inner_product(engine eng, stream stm, T_A* A_buf, T_B* B_buf, T
 
     auto tag_2 = std::chrono::high_resolution_clock::now();
     auto tag_diff = std::chrono::duration<double>(tag_2 - tag_1).count();
-    std::cout << "result: " << (float)C_buf[0] << "," << (float)C_buf[m*n-1] << std::endl;
+    std::cout << "result: " << C_buf[0] << "," << C_buf[m*n-1] << std::endl;
 
     return tag_diff;
 }
@@ -454,6 +459,24 @@ double test_dnnl_inner_product_v2(engine eng, stream stm, T_A* A_buf, T_B* B_buf
 
     return tag_diff;
 }
+
+template <typename T_A, typename T_B, typename T_bias, typename T_C>
+double test_dnnl_inner_product_eltwise(engine eng, stream stm, T_A* A_buf, T_B* B_buf, T_bias* bias_buf, T_C* C_buf, int m, int n, int k)
+{
+    InnerProduct_eltwise(eng, stm, A_buf, B_buf, bias_buf, C_buf, m, n, k);
+
+    auto tag_1 = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < 1000; ++i) {
+        InnerProduct_eltwise(eng, stm, A_buf, B_buf, bias_buf, C_buf, m, n, k);
+    }
+
+    auto tag_2 = std::chrono::high_resolution_clock::now();
+    auto tag_diff = std::chrono::duration<double>(tag_2 - tag_1).count();
+    std::cout << "result: " << C_buf[0] << "," << C_buf[m*n-1] << std::endl;
+
+    return tag_diff;
+}
+
 /*
 struct Code : Xbyak::CodeGenerator {
     const Xbyak::Reg64& src;
