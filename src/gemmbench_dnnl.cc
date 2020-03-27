@@ -9,6 +9,8 @@
 #include <chrono>
 
 #include <mkl.h>
+
+#define EIGEN_USE_MKL_ALL
 #include <Eigen/Dense>
 
 //#define XBYAK_NO_OP_NAMES
