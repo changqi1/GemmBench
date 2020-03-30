@@ -120,6 +120,7 @@ int main(int argc, char *argv[])
     double t_dnnl_ip_bbbb  = test_dnnl_inner_product(cpu_engine, cpu_stream, A_bf16, B_bf16, bias_bf16, C_bf16, m, n, k);
     double t_dnnl_ip_bbbb_e= test_dnnl_inner_product_eltwise(cpu_engine, cpu_stream, A_bf16, B_bf16, bias_bf16, C_bf16, m, n, k);
     double t_dnnl_ip_bbbf  = test_dnnl_inner_product(cpu_engine, cpu_stream, A_bf16, B_bf16, bias_bf16, C, m, n, k);
+    double t_dnnl_ip_bbff  = test_dnnl_inner_product(cpu_engine, cpu_stream, A_bf16, B_bf16, bias, C, m, n, k);
 
     double t_dnnl_mm_ffff  = test_dnnl_matmul(cpu_engine, cpu_stream, A, B, bias, C, m, n, k);
     double t_dnnl_mm_bbbb  = test_dnnl_matmul(cpu_engine, cpu_stream, A_bf16, B_bf16, bias_bf16, C_bf16, m, n, k);
@@ -170,6 +171,7 @@ int main(int argc, char *argv[])
     printf("dnnl inner_product  bbbb:     \t%.6f \t+%.3fX\n", t_dnnl_ip_bbbb,   t_mkl_sgemm/t_dnnl_ip_bbbb);
     printf("dnnl inner_product  bbbb+elw: \t%.6f \t+%.3fX\n", t_dnnl_ip_bbbb_e, t_mkl_sgemm/t_dnnl_ip_bbbb_e);
     printf("dnnl inner_product  bbbf:     \t%.6f \t+%.3fX\n", t_dnnl_ip_bbbf,   t_mkl_sgemm/t_dnnl_ip_bbbf);
+    printf("dnnl inner_product  bbff:     \t%.6f \t+%.3fX\n", t_dnnl_ip_bbff,   t_mkl_sgemm/t_dnnl_ip_bbff);
 
     printf(">> matmul, f: fp32, b: bf16, elw: eltwise\n");
     printf("dnnl matmul ffff:          \t%.6f \t+%.3fX\n", t_dnnl_mm_ffff,   t_mkl_sgemm/t_dnnl_mm_ffff);
