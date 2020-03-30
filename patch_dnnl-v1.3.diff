@@ -1,9 +1,9 @@
 diff --git a/include/bfloat16.hpp b/include/bfloat16.hpp
 new file mode 100644
-index 0000000..bfd8d67
+index 0000000..b0e4b7c
 --- /dev/null
 +++ b/include/bfloat16.hpp
-@@ -0,0 +1,70 @@
+@@ -0,0 +1,75 @@
 +/*******************************************************************************
 +* Copyright 2019-2020 Intel Corporation
 +*
@@ -57,29 +57,34 @@ index 0000000..bfd8d67
 +
 +// performs element-by-element sum of inp and add float arrays and stores
 +// result to bfloat16 out array with downconversion
++// out[:] = (bfloat16_t)(inp0[:] + inp1[:])
 +void DNNL_API add_floats_and_cvt_to_bfloat16(
 +        bfloat16_t *out, const float *inp0, const float *inp1, size_t size);
 +
++// performs element-by-element sum of upconverted bfloat16 inp and float add
++// arrays and stores result to float out array
++// it is safe for out pointer to be equal to the add pointer
++// out[:] = (float)inp[:] + add[:]
++void DNNL_API cvt_bfloat16_and_add_to_float(
++        float *out, const bfloat16_t *inp, const float *add, size_t size);
 +} // namespace impl
 +} // namespace dnnl
 +
 +extern "C" {
-+dnnl_status_t DNNL_API dnnl_gemm_bf16bf16f32(
-+        char transa, char transb,
-+        dnnl_dim_t M, dnnl_dim_t N, dnnl_dim_t K,
-+        float alpha,
-+        const dnnl::impl::bfloat16_t *A, dnnl_dim_t lda,
-+        const dnnl::impl::bfloat16_t *B, dnnl_dim_t ldb,
-+        float beta, float *C, dnnl_dim_t ldc);
++dnnl_status_t DNNL_API dnnl_gemm_bf16bf16f32(char transa, char transb,
++         dnnl_dim_t M, dnnl_dim_t N, dnnl_dim_t K, float alpha, 
++         const dnnl::impl::bfloat16_t *A, dnnl_dim_t lda, 
++         const dnnl::impl::bfloat16_t *B, dnnl_dim_t ldb, float beta,
++         float *C, dnnl_dim_t ldc);
 +}
 +
 +#endif
 diff --git a/src/common/bfloat16.hpp b/src/common/bfloat16.hpp
 deleted file mode 100644
-index 2039904..0000000
+index 80d03ad..0000000
 --- a/src/common/bfloat16.hpp
 +++ /dev/null
-@@ -1,60 +0,0 @@
+@@ -1,67 +0,0 @@
 -/*******************************************************************************
 -* Copyright 2019-2020 Intel Corporation
 -*
@@ -133,9 +138,16 @@ index 2039904..0000000
 -
 -// performs element-by-element sum of inp and add float arrays and stores
 -// result to bfloat16 out array with downconversion
+-// out[:] = (bfloat16_t)(inp0[:] + inp1[:])
 -void add_floats_and_cvt_to_bfloat16(
 -        bfloat16_t *out, const float *inp0, const float *inp1, size_t size);
 -
+-// performs element-by-element sum of upconverted bfloat16 inp and float add
+-// arrays and stores result to float out array
+-// it is safe for out pointer to be equal to the add pointer
+-// out[:] = (float)inp[:] + add[:]
+-void cvt_bfloat16_and_add_to_float(
+-        float *out, const bfloat16_t *inp, const float *add, size_t size);
 -} // namespace impl
 -} // namespace dnnl
 -
