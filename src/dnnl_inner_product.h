@@ -126,6 +126,7 @@ bool InnerProduct(engine eng, stream stm, T_input* input, T_wei* weight, T_bias*
         return false;
     }
     stm.wait();
+    return true;
 }
 
 template <typename T_input, typename T_wei, typename T_bias, typename T_output>
@@ -252,6 +253,7 @@ bool InnerProduct_v2(engine eng, stream stm, T_input* input, T_wei* weight, T_bi
         return false;
     }
     stm.wait();
+    return true;
 }
 
 template <typename T_input, typename T_wei, typename T_bias, typename T_output>
@@ -387,6 +389,7 @@ bool InnerProduct_eltwise(engine eng, stream stm, T_input* input, T_wei* weight,
         return false;
     }
     stm.wait();
+    return true;
 }
 
 #endif

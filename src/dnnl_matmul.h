@@ -127,6 +127,7 @@ bool MatMul(engine eng, stream stm, T_input* input, T_wei* weight, T_bias* bias,
         return false;
     }
     stm.wait();
+    return true;
 }
 
 // No Bias
@@ -230,6 +231,7 @@ bool MatMul2(engine eng, stream stm, T_input* input, T_wei* weight, T_output* ou
         return false;
     }
     stm.wait();
+    return true;
 }
 
 template <typename T_input, typename T_wei, typename T_output>
@@ -341,6 +343,7 @@ bool MatMul2_eltwise(engine eng, stream stm, T_input* input, T_wei* weight, T_ou
         return false;
     }
     stm.wait();
+    return true;
 }
 
 
@@ -451,6 +454,7 @@ bool BatchMatMul(engine eng, stream stm, T_input* input, T_wei* weight, T_output
         return false;
     }
     stm.wait();
+    return true;
 }
 
 #endif
