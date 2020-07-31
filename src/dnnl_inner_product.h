@@ -129,6 +129,7 @@ bool InnerProduct(engine eng, stream stm, T_input* input, T_wei* weight, T_bias*
     return true;
 }
 
+// must be bf16 emgine
 template <typename T_input, typename T_wei, typename T_bias, typename T_output>
 bool InnerProduct_v2(engine eng, stream stm, T_input* input, T_wei* weight, T_bias* bias, T_output* output, int m, int n, int k)
 {

@@ -20,11 +20,14 @@
 #include "dnnl_inner_product.h"
 #include "dnnl_matmul.h"
 
-void init_param(int m, int n, int k, float *A, float *B, float *C, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16, Eigen::MatrixXf& A_mat, Eigen::MatrixXf& B_mat, Eigen::MatrixXf& C_mat);
+void init_param(int m, int n, int k, float *A, float *B, float *C, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16,
+                Eigen::MatrixXf& A_mat, Eigen::MatrixXf& B_mat, Eigen::MatrixXf& C_mat, float *A_pad, float *B_pad, float *C_pad, int A_stride, int B_stride, int C_stride);
 
 double test_eigen_sgemm(Eigen::MatrixXf& A_mat, Eigen::MatrixXf& B_mat, Eigen::MatrixXf& C_mat, int m, int n, int k);
 double test_mkl_sgemm(float *A, float *B, float *C, int m, int n, int k);
+double test_mkl_sgemm_padding(float *A_pad, float *B_pad, float *C_pad, int m, int n, int k, int A_stride, int B_stride, int C_stride);
 double test_mkl_sgemm_transB(float *A, float *B, float *C, int m, int n, int k);
+double test_mkl_sgemm_transB_padding(float *A_pad, float *B_pad, float *C_pad, int m, int n, int k, int A_stride, int B_stride, int C_stride);
 double test_dnnl_sgemm(float *A, float *B, float *C, int m, int n, int k);
 double test_dnnl_gemm_bf16bf16f32(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16);
 double test_dnnl_gemm_bf16bf16f32_transB(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16);
@@ -55,16 +58,23 @@ double test_dnnl_matmul2_eltwise(engine eng, stream stm, T_A* A_buf, T_B* B_buf,
 template <typename T_A, typename T_B, typename T_C>
 double test_dnnl_batchmatmul(engine eng, stream stm, T_A* A_buf, T_B* B_buf, T_C* C_buf, int mb, int m, int n, int k);
 
+int padding(int cols) {
+    int skip = (16 - cols % 16) % 16;
+    int stride = cols + skip;
+    if (stride % 256 == 0) {
+        stride += 4;
+    }
+    return stride;
+}
 
 int main(int argc, char *argv[])
 {
-    printf("./gemmbench_dnnl m n k\nargc = %d\n", argc);
-    for(int ndx = 0; ndx != argc; ++ndx)
-        printf("argv[%d] --> %s\n", ndx, argv[ndx]);
-
     int m = atoi(argv[1]);
     int n = atoi(argv[2]);
     int k = atoi(argv[3]);
+
+    printf("m = %d, n = %d, k = %d\n", m, n, k);
+    printf("A(%d, %d) * B(%d, %d) = C(%d, %d)\n", m, k, k, n, m, n);
 
     bfloat16 *A_bf16 = new bfloat16[m*k];
     bfloat16 *B_bf16 = new bfloat16[k*n];
@@ -74,17 +84,29 @@ int main(int argc, char *argv[])
     float *B = new float[k*n];
     float *C = new float[m*n];
 
+    int A_stride = padding(k);
+    int B_stride = padding(n);
+    int C_stride = padding(n);
+    printf("A padding -> %d\n", A_stride);
+    printf("B padding -> %d\n", B_stride);
+    printf("C padding -> %d\n", C_stride);
+    float *A_pad = new float[m*A_stride];
+    float *B_pad = new float[k*B_stride];
+    float *C_pad = new float[m*C_stride];
+
     Eigen::MatrixXf A_mat(m, k);
     Eigen::MatrixXf B_mat(k, n);
     Eigen::MatrixXf C_mat(m, n);
 
-    init_param(m, n, k, A, B, C, A_bf16, B_bf16, C_bf16, A_mat, B_mat, C_mat);
+    init_param(m, n, k, A, B, C, A_bf16, B_bf16, C_bf16, A_mat, B_mat, C_mat, A_pad, B_pad, C_pad, A_stride, B_stride, C_stride);
     std::cout << "\nstarting..." << std::endl;
 
     double t_eigen_sgemm  = test_eigen_sgemm(A_mat, B_mat, C_mat, m, n, k);
 
     double t_mkl_sgemm    = test_mkl_sgemm(A, B, C, m, n, k);
+    double t_mkl_sgemm_pd = test_mkl_sgemm_padding(A_pad, B_pad, C_pad, m, n, k, A_stride, B_stride, C_stride);
     double t_mkl_sgemm_tB = test_mkl_sgemm_transB(A, B, C, m, n, k);
+    double t_mkl_sgemm_tp = test_mkl_sgemm_transB_padding(A_pad, B_pad, C_pad, m, n, k, A_stride, B_stride, C_stride);
 
     double t_dnnl_sgemm = test_dnnl_sgemm(A, B, C, m, n, k);
     double t_dnnl_gemm_bf16 = test_dnnl_gemm_bf16bf16f32(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
@@ -149,7 +171,9 @@ int main(int argc, char *argv[])
     printf("\n>> omp num_procs: %d\n", omp_get_num_procs());
     printf("eigen sgemm:               \t%.6f\n", t_eigen_sgemm);
     printf("mkl sgemm:                 \t%.6f ms --> baseline\n", t_mkl_sgemm);
+    printf("mkl sgemm+pad:             \t%.6f \t+%.3fX\n", t_mkl_sgemm_pd,		t_mkl_sgemm/t_mkl_sgemm_pd);
     printf("mkl sgemm+transB:          \t%.6f \t+%.3fX\n", t_mkl_sgemm_tB,              t_mkl_sgemm/t_mkl_sgemm_tB);
+    printf("mkl sgemm+transB+pad:      \t%.6f \t+%.3fX\n", t_mkl_sgemm_tp,              t_mkl_sgemm/t_mkl_sgemm_tp);
     printf("dnnl sgemm:                \t%.6f \t+%.3fX\n", t_dnnl_sgemm,                t_mkl_sgemm/t_dnnl_sgemm);
     printf("dnnl bgemm:                \t%.6f \t+%.3fX\n", t_dnnl_gemm_bf16,            t_mkl_sgemm/t_dnnl_gemm_bf16);
     printf("dnnl bgemm+transB:         \t%.6f \t+%.3fX\n", t_dnnl_gemm_bf16_tB,         t_mkl_sgemm/t_dnnl_gemm_bf16_tB);
@@ -192,16 +216,24 @@ int main(int argc, char *argv[])
     delete[] B;
     delete[] C;
 
+    delete[] A_pad;
+    delete[] B_pad;
+    delete[] C_pad;
+
     return 0;
 }
 
 
-void init_param(int m, int n, int k, float *A, float *B, float *C, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16, Eigen::MatrixXf& A_mat, Eigen::MatrixXf& B_mat, Eigen::MatrixXf& C_mat)
+void init_param(int m, int n, int k, float *A, float *B, float *C, \
+		bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16, \
+		Eigen::MatrixXf& A_mat, Eigen::MatrixXf& B_mat, Eigen::MatrixXf& C_mat, \
+		float *A_pad, float *B_pad, float *C_pad, int A_stride, int B_stride, int C_stride)
 {
     for (int i = 0; i < m; ++i) {
         for (int j = 0; j < k; ++j) {
             A_bf16[i*k+j] = (bfloat16)1.1;
             A[i*k+j] = 1.1;
+            A_pad[i*A_stride+j] = 1.1;
             A_mat.row(i).col(j) << 1.1;
         }
     }
@@ -210,6 +242,7 @@ void init_param(int m, int n, int k, float *A, float *B, float *C, bfloat16 *A_b
         for (int j = 0; j < n; ++j) {
             B_bf16[i*n+j] = (bfloat16)1.1;
             B[i*n+j] = 1.1;
+            B_pad[i*B_stride+j] = 1.1;
             B_mat.row(i).col(j) << 1.1;
         }
     }
@@ -218,6 +251,7 @@ void init_param(int m, int n, int k, float *A, float *B, float *C, bfloat16 *A_b
         for (int j = 0; j < n; ++j) {
             C_bf16[i*n+j] = (bfloat16)1.1;
             C[i*n+j] = 1.1;
+            C_pad[i*C_stride+j] = 1.1;
             C_mat.row(i).col(j) << 1.1;
         }
     }
@@ -255,6 +289,22 @@ double test_mkl_sgemm(float *A, float *B, float *C, int m, int n, int k)
     return tag_diff;
 }
 
+double test_mkl_sgemm_padding(float *A_pad, float *B_pad, float *C_pad, int m, int n, int k, int A_stride, int B_stride, int C_stride)
+{
+    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, m, n, k, 1.0, A_pad, A_stride, B_pad, B_stride, 0.0, C_pad, C_stride);
+
+    auto tag_1 = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < 1000; ++i) {
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, m, n, k, 1.0, A_pad, A_stride, B_pad, B_stride, 0.0, C_pad, C_stride);
+    }
+
+    auto tag_2 = std::chrono::high_resolution_clock::now();
+    auto tag_diff = std::chrono::duration<double>(tag_2 - tag_1).count();
+    std::cout << "result: " << C_pad[0] << "," << C_pad[m*n-1] << std::endl;
+
+    return tag_diff;
+}
+
 double test_mkl_sgemm_transB(float *A, float *B, float *C, int m, int n, int k)
 {
     cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, m, n, k, 1.0, A, k, B, k, 0.0, C, n);
@@ -267,6 +317,22 @@ double test_mkl_sgemm_transB(float *A, float *B, float *C, int m, int n, int k)
     auto tag_2 = std::chrono::high_resolution_clock::now();
     auto tag_diff = std::chrono::duration<double>(tag_2 - tag_1).count();
     std::cout << "result: " << C[0] << "," << C[m*n-1] << std::endl;
+
+    return tag_diff;
+}
+
+double test_mkl_sgemm_transB_padding(float *A_pad, float *B_pad, float *C_pad, int m, int n, int k, int A_stride, int B_stride, int C_stride)
+{
+    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, m, n, k, 1.0, A_pad, A_stride, B_pad, A_stride, 0.0, C_pad, C_stride);
+
+    auto tag_1 = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < 1000; ++i) {
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, m, n, k, 1.0, A_pad, A_stride, B_pad, A_stride, 0.0, C_pad, C_stride);
+    }
+
+    auto tag_2 = std::chrono::high_resolution_clock::now();
+    auto tag_diff = std::chrono::duration<double>(tag_2 - tag_1).count();
+    std::cout << "result: " << C_pad[0] << "," << C_pad[m*n-1] << std::endl;
 
     return tag_diff;
 }
