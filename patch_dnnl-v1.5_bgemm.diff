@@ -1,0 +1,454 @@
+diff --git a/src/common/bfloat16.hpp b/include/bfloat16.hpp
+similarity index 68%
+rename from src/common/bfloat16.hpp
+rename to include/bfloat16.hpp
+index e5abf7641..b24daf1ea 100644
+--- a/src/common/bfloat16.hpp
++++ b/include/bfloat16.hpp
+@@ -46,22 +46,39 @@ struct bfloat16_t {
+ 
+ static_assert(sizeof(bfloat16_t) == 2, "bfloat16_t must be 2 bytes");
+ 
+-void cvt_float_to_bfloat16(bfloat16_t *out, const float *inp, size_t nelems);
+-void cvt_bfloat16_to_float(float *out, const bfloat16_t *inp, size_t nelems);
++void DNNL_API cvt_float_to_bfloat16(bfloat16_t *out, const float *inp, size_t nelems);
++void DNNL_API cvt_bfloat16_to_float(float *out, const bfloat16_t *inp, size_t nelems);
+ 
+ // performs element-by-element sum of inp and add float arrays and stores
+ // result to bfloat16 out array with downconversion
+ // out[:] = (bfloat16_t)(inp0[:] + inp1[:])
+-void add_floats_and_cvt_to_bfloat16(
++void DNNL_API add_floats_and_cvt_to_bfloat16(
+         bfloat16_t *out, const float *inp0, const float *inp1, size_t nelems);
+ 
+ // performs element-by-element sum of upconverted bfloat16 inp and float add
+ // arrays and stores result to float out array
+ // it is safe for out pointer to be equal to the add pointer
+ // out[:] = (float)inp[:] + add[:]
+-void cvt_bfloat16_and_add_to_float(
++void DNNL_API cvt_bfloat16_and_add_to_float(
+         float *out, const bfloat16_t *inp, const float *add, size_t size);
+ } // namespace impl
++
++extern "C" {
++dnnl_status_t DNNL_API dnnl_gemm_bf16bf16f32(char transa, char transb,
++         dnnl_dim_t M, dnnl_dim_t N, dnnl_dim_t K, float alpha,
++         const dnnl::impl::bfloat16_t *A, dnnl_dim_t lda,
++         const dnnl::impl::bfloat16_t *B, dnnl_dim_t ldb, float beta,
++         float *C, dnnl_dim_t ldc);
++}
++
++extern "C" {
++dnnl_status_t DNNL_API dnnl_gemm_bf16bf16f32_tp(char transa, char transb,
++         dnnl_dim_t M, dnnl_dim_t N, dnnl_dim_t K, float alpha,
++         const dnnl::impl::bfloat16_t *A, dnnl_dim_t lda,
++         const dnnl::impl::bfloat16_t *B, dnnl_dim_t ldb, float beta,
++         float *C, dnnl_dim_t ldc, void *th);
++}
++
+ } // namespace dnnl
+ 
+ #endif
+diff --git a/src/cpu/bfloat16.cpp b/src/cpu/bfloat16.cpp
+index 665eb506f..66e11c746 100644
+--- a/src/cpu/bfloat16.cpp
++++ b/src/cpu/bfloat16.cpp
+@@ -17,7 +17,7 @@
+ #include <array>
+ #include <memory>
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "common/bit_cast.hpp"
+ #include "common/dnnl_thread.hpp"
+ 
+diff --git a/src/cpu/gemm/gemm.cpp b/src/cpu/gemm/gemm.cpp
+index 15d31beec..bc649ac28 100644
+--- a/src/cpu/gemm/gemm.cpp
++++ b/src/cpu/gemm/gemm.cpp
+@@ -19,7 +19,7 @@
+ #include "dnnl_threadpool_iface.hpp"
+ #endif
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "common/c_types_map.hpp"
+ #include "common/dnnl_thread.hpp"
+ #include "common/dnnl_traits.hpp"
+diff --git a/src/cpu/gemm/gemm.hpp b/src/cpu/gemm/gemm.hpp
+index 3b04218af..a4207ce69 100644
+--- a/src/cpu/gemm/gemm.hpp
++++ b/src/cpu/gemm/gemm.hpp
+@@ -19,7 +19,7 @@
+ 
+ #include "dnnl_types.h"
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ 
+ #include "cpu/platform.hpp"
+ 
+diff --git a/src/cpu/gemm/gemm_pack.hpp b/src/cpu/gemm/gemm_pack.hpp
+index 0b872dffd..3cc68db36 100644
+--- a/src/cpu/gemm/gemm_pack.hpp
++++ b/src/cpu/gemm/gemm_pack.hpp
+@@ -20,7 +20,7 @@
+ #include "dnnl_config.h"
+ #include "dnnl_types.h"
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ 
+ namespace dnnl {
+ namespace impl {
+diff --git a/src/cpu/gemm_convolution_utils.cpp b/src/cpu/gemm_convolution_utils.cpp
+index aa4f9b88d..6941bd0a5 100644
+--- a/src/cpu/gemm_convolution_utils.cpp
++++ b/src/cpu/gemm_convolution_utils.cpp
+@@ -21,7 +21,7 @@
+ #include "common/type_helpers.hpp"
+ #include "common/utils.hpp"
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "cpu/gemm_convolution_utils.hpp"
+ 
+ #include "cpu/platform.hpp"
+diff --git a/src/cpu/matmul/gemm_bf16_matmul.hpp b/src/cpu/matmul/gemm_bf16_matmul.hpp
+index c5479d6ff..15763e831 100644
+--- a/src/cpu/matmul/gemm_bf16_matmul.hpp
++++ b/src/cpu/matmul/gemm_bf16_matmul.hpp
+@@ -19,7 +19,7 @@
+ 
+ #include <assert.h>
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "common/c_types_map.hpp"
+ #include "common/primitive.hpp"
+ #include "common/type_helpers.hpp"
+diff --git a/src/cpu/matmul/ref_matmul.hpp b/src/cpu/matmul/ref_matmul.hpp
+index a6ad5fd7f..c197ff80b 100644
+--- a/src/cpu/matmul/ref_matmul.hpp
++++ b/src/cpu/matmul/ref_matmul.hpp
+@@ -19,7 +19,7 @@
+ 
+ #include <assert.h>
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "common/c_types_map.hpp"
+ #include "common/primitive.hpp"
+ #include "common/type_helpers.hpp"
+diff --git a/src/cpu/nchw_pooling.hpp b/src/cpu/nchw_pooling.hpp
+index 06ce42570..06d26fc6d 100644
+--- a/src/cpu/nchw_pooling.hpp
++++ b/src/cpu/nchw_pooling.hpp
+@@ -19,7 +19,7 @@
+ 
+ #include <assert.h>
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "common/c_types_map.hpp"
+ #include "common/dnnl_thread.hpp"
+ #include "common/primitive.hpp"
+diff --git a/src/cpu/nhwc_pooling.hpp b/src/cpu/nhwc_pooling.hpp
+index dea3b1047..644f71548 100644
+--- a/src/cpu/nhwc_pooling.hpp
++++ b/src/cpu/nhwc_pooling.hpp
+@@ -19,7 +19,7 @@
+ 
+ #include <assert.h>
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "common/c_types_map.hpp"
+ #include "common/dnnl_thread.hpp"
+ #include "common/primitive.hpp"
+diff --git a/src/cpu/ref_batch_normalization.cpp b/src/cpu/ref_batch_normalization.cpp
+index a3b46b18d..c29cc2efc 100644
+--- a/src/cpu/ref_batch_normalization.cpp
++++ b/src/cpu/ref_batch_normalization.cpp
+@@ -17,7 +17,7 @@
+ #include <assert.h>
+ #include <math.h>
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "common/c_types_map.hpp"
+ #include "common/dnnl_thread.hpp"
+ #include "common/memory_tracking.hpp"
+diff --git a/src/cpu/rnn/cell_common.cpp b/src/cpu/rnn/cell_common.cpp
+index 3770a3c6d..da51ddb51 100644
+--- a/src/cpu/rnn/cell_common.cpp
++++ b/src/cpu/rnn/cell_common.cpp
+@@ -18,7 +18,7 @@
+  * Common for RNN and LSTM cell execution
+  */
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ 
+ #include "cpu/rnn/ref_rnn.hpp"
+ 
+diff --git a/src/cpu/rnn/rnn_reorders.hpp b/src/cpu/rnn/rnn_reorders.hpp
+index 1cf019278..f5c9f7fcc 100644
+--- a/src/cpu/rnn/rnn_reorders.hpp
++++ b/src/cpu/rnn/rnn_reorders.hpp
+@@ -19,7 +19,7 @@
+ 
+ #include <assert.h>
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "common/dnnl_thread.hpp"
+ #include "common/primitive.hpp"
+ #include "common/type_helpers.hpp"
+diff --git a/src/cpu/simple_reorder.hpp b/src/cpu/simple_reorder.hpp
+index 7c0b4fdbd..e55f403eb 100644
+--- a/src/cpu/simple_reorder.hpp
++++ b/src/cpu/simple_reorder.hpp
+@@ -19,7 +19,7 @@
+ 
+ #include <assert.h>
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "common/c_types_map.hpp"
+ #include "common/dnnl_thread.hpp"
+ #include "common/math_utils.hpp"
+diff --git a/src/cpu/simple_resampling.cpp b/src/cpu/simple_resampling.cpp
+index c26b746a3..c29b07dd2 100644
+--- a/src/cpu/simple_resampling.cpp
++++ b/src/cpu/simple_resampling.cpp
+@@ -18,7 +18,7 @@
+ #include <float.h>
+ #include <math.h>
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "common/c_types_map.hpp"
+ #include "common/dnnl_thread.hpp"
+ #include "common/math_utils.hpp"
+diff --git a/src/cpu/simple_sum.cpp b/src/cpu/simple_sum.cpp
+index eb73a17eb..2c4ad8433 100644
+--- a/src/cpu/simple_sum.cpp
++++ b/src/cpu/simple_sum.cpp
+@@ -15,7 +15,7 @@
+ *******************************************************************************/
+ 
+ #include "cpu/simple_sum.hpp"
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "common/dnnl_thread.hpp"
+ 
+ namespace dnnl {
+diff --git a/src/cpu/x64/gemm/gemm_driver.cpp b/src/cpu/x64/gemm/gemm_driver.cpp
+index 96880e4e9..89732008f 100644
+--- a/src/cpu/x64/gemm/gemm_driver.cpp
++++ b/src/cpu/x64/gemm/gemm_driver.cpp
+@@ -21,7 +21,7 @@
+ 
+ #include "dnnl_types.h"
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "common/dnnl_traits.hpp"
+ #include "common/nstl.hpp"
+ #include "common/utils.hpp"
+diff --git a/src/cpu/x64/gemm/gemm_info.cpp b/src/cpu/x64/gemm/gemm_info.cpp
+index 7485c0a03..95a9d34d3 100644
+--- a/src/cpu/x64/gemm/gemm_info.cpp
++++ b/src/cpu/x64/gemm/gemm_info.cpp
+@@ -19,7 +19,7 @@
+ 
+ #include "dnnl_types.h"
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "common/dnnl_traits.hpp"
+ 
+ #include "cpu/x64/cpu_isa_traits.hpp"
+diff --git a/src/cpu/x64/gemm/gemm_pack.hpp b/src/cpu/x64/gemm/gemm_pack.hpp
+index fa11ab91c..b4104376c 100644
+--- a/src/cpu/x64/gemm/gemm_pack.hpp
++++ b/src/cpu/x64/gemm/gemm_pack.hpp
+@@ -20,7 +20,7 @@
+ #include "dnnl_config.h"
+ #include "dnnl_types.h"
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ 
+ namespace dnnl {
+ namespace impl {
+diff --git a/src/cpu/x64/gemm/gemv_driver.cpp b/src/cpu/x64/gemm/gemv_driver.cpp
+index 159fcbc0c..03115bc1f 100644
+--- a/src/cpu/x64/gemm/gemv_driver.cpp
++++ b/src/cpu/x64/gemm/gemv_driver.cpp
+@@ -18,7 +18,7 @@
+ 
+ #include "dnnl_types.h"
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "common/dnnl_thread.hpp"
+ #include "common/nstl.hpp"
+ 
+diff --git a/src/cpu/x64/gemm/s8x8s32/jit_avx512_core_gemv_s8x8s32.cpp b/src/cpu/x64/gemm/s8x8s32/jit_avx512_core_gemv_s8x8s32.cpp
+index d57e20243..de053ee14 100644
+--- a/src/cpu/x64/gemm/s8x8s32/jit_avx512_core_gemv_s8x8s32.cpp
++++ b/src/cpu/x64/gemm/s8x8s32/jit_avx512_core_gemv_s8x8s32.cpp
+@@ -16,7 +16,7 @@
+ 
+ #include <type_traits>
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "common/dnnl_thread.hpp"
+ #include "common/nstl.hpp"
+ 
+diff --git a/src/cpu/x64/gemm_bf16_convolution.cpp b/src/cpu/x64/gemm_bf16_convolution.cpp
+index 825158148..7656a1bc3 100644
+--- a/src/cpu/x64/gemm_bf16_convolution.cpp
++++ b/src/cpu/x64/gemm_bf16_convolution.cpp
+@@ -16,7 +16,7 @@
+ 
+ #include "dnnl_types.h"
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "common/c_types_map.hpp"
+ #include "common/dnnl_thread.hpp"
+ #include "common/type_helpers.hpp"
+diff --git a/src/cpu/x64/gemm_bf16_inner_product.cpp b/src/cpu/x64/gemm_bf16_inner_product.cpp
+index d4ef6254c..d8e8d0870 100644
+--- a/src/cpu/x64/gemm_bf16_inner_product.cpp
++++ b/src/cpu/x64/gemm_bf16_inner_product.cpp
+@@ -14,7 +14,7 @@
+ * limitations under the License.
+ *******************************************************************************/
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "common/c_types_map.hpp"
+ #include "common/dnnl_thread.hpp"
+ #include "common/type_helpers.hpp"
+diff --git a/src/cpu/x64/jit_avx512_common_resampling.cpp b/src/cpu/x64/jit_avx512_common_resampling.cpp
+index 8d8e6c927..d48e7ab46 100644
+--- a/src/cpu/x64/jit_avx512_common_resampling.cpp
++++ b/src/cpu/x64/jit_avx512_common_resampling.cpp
+@@ -16,7 +16,7 @@
+ 
+ #include <assert.h>
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "common/c_types_map.hpp"
+ #include "common/dnnl_thread.hpp"
+ #include "common/type_helpers.hpp"
+diff --git a/src/cpu/x64/jit_avx512_core_bf16_conv_kernel.cpp b/src/cpu/x64/jit_avx512_core_bf16_conv_kernel.cpp
+index 4af37baa5..a66f82a4b 100644
+--- a/src/cpu/x64/jit_avx512_core_bf16_conv_kernel.cpp
++++ b/src/cpu/x64/jit_avx512_core_bf16_conv_kernel.cpp
+@@ -14,7 +14,7 @@
+ * limitations under the License.
+ *******************************************************************************/
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "common/c_types_map.hpp"
+ #include "common/math_utils.hpp"
+ #include "common/nstl.hpp"
+diff --git a/src/cpu/x64/jit_avx512_core_bf16_convolution.cpp b/src/cpu/x64/jit_avx512_core_bf16_convolution.cpp
+index dd45738a2..18437b13b 100644
+--- a/src/cpu/x64/jit_avx512_core_bf16_convolution.cpp
++++ b/src/cpu/x64/jit_avx512_core_bf16_convolution.cpp
+@@ -19,7 +19,7 @@
+ #include "common/type_helpers.hpp"
+ #include "common/utils.hpp"
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "cpu/x64/jit_avx512_core_bf16_convolution.hpp"
+ 
+ namespace dnnl {
+diff --git a/src/cpu/x64/jit_avx512_core_bf16cvt.hpp b/src/cpu/x64/jit_avx512_core_bf16cvt.hpp
+index ba3390fdf..233bb4eda 100644
+--- a/src/cpu/x64/jit_avx512_core_bf16cvt.hpp
++++ b/src/cpu/x64/jit_avx512_core_bf16cvt.hpp
+@@ -25,7 +25,7 @@
+ #include "cpu/x64/cpu_isa_traits.hpp"
+ #include "dnnl_debug.h"
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "cpu/x64/jit_generator.hpp"
+ 
+ namespace dnnl {
+diff --git a/src/cpu/x64/jit_uni_dw_convolution.cpp b/src/cpu/x64/jit_uni_dw_convolution.cpp
+index 5778ed8ff..19b6a6173 100644
+--- a/src/cpu/x64/jit_uni_dw_convolution.cpp
++++ b/src/cpu/x64/jit_uni_dw_convolution.cpp
+@@ -18,7 +18,7 @@
+ #include "common/dnnl_thread.hpp"
+ #include "common/memory_tracking.hpp"
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ 
+ #include "cpu/x64/jit_uni_dw_convolution.hpp"
+ 
+diff --git a/src/cpu/x64/jit_uni_eltwise.cpp b/src/cpu/x64/jit_uni_eltwise.cpp
+index d82fa7adb..328a03245 100644
+--- a/src/cpu/x64/jit_uni_eltwise.cpp
++++ b/src/cpu/x64/jit_uni_eltwise.cpp
+@@ -14,7 +14,7 @@
+ * limitations under the License.
+ *******************************************************************************/
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "common/c_types_map.hpp"
+ #include "common/dnnl_thread.hpp"
+ #include "common/nstl.hpp"
+diff --git a/src/gpu/compute/kernel_arg_list.hpp b/src/gpu/compute/kernel_arg_list.hpp
+index a38c95c0e..c7580dfc6 100644
+--- a/src/gpu/compute/kernel_arg_list.hpp
++++ b/src/gpu/compute/kernel_arg_list.hpp
+@@ -21,7 +21,7 @@
+ #include <cstddef>
+ #include <type_traits>
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "common/float16.hpp"
+ #include "common/memory_storage.hpp"
+ #include "common/nstl.hpp"
+diff --git a/tests/benchdnn/dnnl_common.hpp b/tests/benchdnn/dnnl_common.hpp
+index 1b117fc4b..85f13f60b 100644
+--- a/tests/benchdnn/dnnl_common.hpp
++++ b/tests/benchdnn/dnnl_common.hpp
+@@ -22,7 +22,7 @@
+ #include <vector>
+ 
+ #include "dnnl.h"
+-#include "src/common/bfloat16.hpp"
++#include "include/bfloat16.hpp"
+ #include "src/common/float16.hpp"
+ #include "src/common/nstl.hpp"
+ 
+diff --git a/tests/gtests/dnnl_test_common.hpp b/tests/gtests/dnnl_test_common.hpp
+index 8ce9c3811..5c705992c 100644
+--- a/tests/gtests/dnnl_test_common.hpp
++++ b/tests/gtests/dnnl_test_common.hpp
+@@ -40,7 +40,7 @@
+ #include "dnnl_test_common_ocl.hpp"
+ #endif
+ 
+-#include "src/common/bfloat16.hpp"
++#include "include/bfloat16.hpp"
+ #include "src/common/float16.hpp"
+ #include "src/common/memory_desc_wrapper.hpp"
+ #include "src/common/nstl.hpp"

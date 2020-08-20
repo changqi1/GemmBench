@@ -1,0 +1,221 @@
+diff --git a/src/common/bfloat16.hpp b/include/bfloat16.hpp
+similarity index 68%
+rename from src/common/bfloat16.hpp
+rename to include/bfloat16.hpp
+index 4897fff46..2067503ee 100644
+--- a/src/common/bfloat16.hpp
++++ b/include/bfloat16.hpp
+@@ -46,22 +46,38 @@ struct bfloat16_t {
+ 
+ static_assert(sizeof(bfloat16_t) == 2, "bfloat16_t must be 2 bytes");
+ 
+-void cvt_float_to_bfloat16(bfloat16_t *out, const float *inp, size_t nelems);
+-void cvt_bfloat16_to_float(float *out, const bfloat16_t *inp, size_t nelems);
++void DNNL_API cvt_float_to_bfloat16(bfloat16_t *out, const float *inp, size_t nelems);
++void DNNL_API cvt_bfloat16_to_float(float *out, const bfloat16_t *inp, size_t nelems);
+ 
+ // performs element-by-element sum of inp and add float arrays and stores
+ // result to bfloat16 out array with downconversion
+ // out[:] = (bfloat16_t)(inp0[:] + inp1[:])
+-void add_floats_and_cvt_to_bfloat16(
++void DNNL_API add_floats_and_cvt_to_bfloat16(
+         bfloat16_t *out, const float *inp0, const float *inp1, size_t nelems);
+ 
+ // performs element-by-element sum of upconverted bfloat16 inp and float add
+ // arrays and stores result to float out array
+ // it is safe for out pointer to be equal to the add pointer
+ // out[:] = (float)inp[:] + add[:]
+-void cvt_bfloat16_and_add_to_float(
++void DNNL_API cvt_bfloat16_and_add_to_float(
+         float *out, const bfloat16_t *inp, const float *add, size_t size);
+ } // namespace impl
+ } // namespace dnnl
+ 
++extern "C" {
++dnnl_status_t DNNL_API dnnl_gemm_bf16bf16f32(char transa, char transb,
++         dnnl_dim_t M, dnnl_dim_t N, dnnl_dim_t K, float alpha,
++         const dnnl::impl::bfloat16_t *A, dnnl_dim_t lda,
++         const dnnl::impl::bfloat16_t *B, dnnl_dim_t ldb, float beta,
++         float *C, dnnl_dim_t ldc);
++}
++
++extern "C" {
++dnnl_status_t DNNL_API dnnl_gemm_bf16bf16f32_tp(char transa, char transb,
++         dnnl_dim_t M, dnnl_dim_t N, dnnl_dim_t K, float alpha,
++         const dnnl::impl::bfloat16_t *A, dnnl_dim_t lda,
++         const dnnl::impl::bfloat16_t *B, dnnl_dim_t ldb, float beta,
++         float *C, dnnl_dim_t ldc, void *th);
++}
++
+ #endif
+diff --git a/src/cpu/gemm/gemm.cpp b/src/cpu/gemm/gemm.cpp
+index 0e1c8feb0..a472c0152 100644
+--- a/src/cpu/gemm/gemm.cpp
++++ b/src/cpu/gemm/gemm.cpp
+@@ -37,7 +37,7 @@
+ #include "s8x8s32/ref_gemm_s8x8s32.hpp"
+ #include "s8x8s32/simple_gemm_s8s8s32.hpp"
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "os_blas.hpp"
+ 
+ namespace dnnl {
+@@ -285,7 +285,7 @@ dnnl_status_t dnnl_gemm_s8s8s32(char transa, char transb, char offsetc, dim_t M,
+             &K, &alpha, B, &ldb, &bo, A, &lda, &ao, &beta, C, &ldc, co);
+ }
+ 
+-extern "C" dnnl_status_t DNNL_API dnnl_gemm_bf16bf16f32(char transa,
++extern "C" dnnl_status_t dnnl_gemm_bf16bf16f32(char transa,
+         char transb, dim_t M, dim_t N, dim_t K, float alpha,
+         const bfloat16_t *A, dim_t lda, const bfloat16_t *B, dim_t ldb,
+         float beta, float *C, dim_t ldc) {
+@@ -327,7 +327,7 @@ dnnl_status_t dnnl_gemm_s8s8s32_tp(char transa, char transb, char offsetc,
+     return status;
+ }
+ 
+-extern "C" dnnl_status_t DNNL_API dnnl_gemm_bf16bf16f32_tp(char transa,
++extern "C" dnnl_status_t dnnl_gemm_bf16bf16f32_tp(char transa,
+         char transb, dim_t M, dim_t N, dim_t K, float alpha,
+         const bfloat16_t *A, dim_t lda, const bfloat16_t *B, dim_t ldb,
+         float beta, float *C, dim_t ldc, void *th) {
+diff --git a/src/cpu/gemm/gemm_driver.cpp b/src/cpu/gemm/gemm_driver.cpp
+index a14d3591b..f082ab4cc 100644
+--- a/src/cpu/gemm/gemm_driver.cpp
++++ b/src/cpu/gemm/gemm_driver.cpp
+@@ -21,7 +21,7 @@
+ 
+ #include "gemm_driver.hpp"
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "dnnl_traits.hpp"
+ #include "dnnl_types.h"
+ #include "f32/gemm_utils_f32.hpp"
+diff --git a/src/cpu/gemm/gemm_info.cpp b/src/cpu/gemm/gemm_info.cpp
+index c1ced28eb..a10e3b9e8 100644
+--- a/src/cpu/gemm/gemm_info.cpp
++++ b/src/cpu/gemm/gemm_info.cpp
+@@ -21,7 +21,7 @@
+ 
+ #include "bf16/common_s16.hpp"
+ #include "bf16/jit_avx512_core_gemm_bf16bf16f32_kern.hpp"
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "cpu_isa_traits.hpp"
+ #include "dnnl_traits.hpp"
+ #include "dnnl_types.h"
+diff --git a/src/cpu/gemm/gemv_driver.cpp b/src/cpu/gemm/gemv_driver.cpp
+index c5159e259..138e7d781 100644
+--- a/src/cpu/gemm/gemv_driver.cpp
++++ b/src/cpu/gemm/gemv_driver.cpp
+@@ -18,7 +18,7 @@
+ 
+ #include "gemv_driver.hpp"
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "cpu_isa_traits.hpp"
+ #include "dnnl_thread.hpp"
+ #include "dnnl_types.h"
+diff --git a/src/cpu/gemm/s8x8s32/jit_avx512_core_gemv_s8x8s32.cpp b/src/cpu/gemm/s8x8s32/jit_avx512_core_gemv_s8x8s32.cpp
+index fd625efc4..9e6839c1c 100644
+--- a/src/cpu/gemm/s8x8s32/jit_avx512_core_gemv_s8x8s32.cpp
++++ b/src/cpu/gemm/s8x8s32/jit_avx512_core_gemv_s8x8s32.cpp
+@@ -20,7 +20,7 @@
+ 
+ #include "../gemm_info.hpp"
+ #include "../gemm_utils.hpp"
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "common_u8.hpp"
+ #include "dnnl_thread.hpp"
+ #include "jit_generator.hpp"
+diff --git a/src/cpu/gemm_bf16_convolution.cpp b/src/cpu/gemm_bf16_convolution.cpp
+index 9848d3ae9..b1041952b 100644
+--- a/src/cpu/gemm_bf16_convolution.cpp
++++ b/src/cpu/gemm_bf16_convolution.cpp
+@@ -17,7 +17,7 @@
+ #include "dnnl_types.h"
+ 
+ #include "c_types_map.hpp"
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "dnnl_thread.hpp"
+ #include "gemm_bf16_convolution.hpp"
+ #include "type_helpers.hpp"
+diff --git a/src/cpu/gemm_convolution_utils.cpp b/src/cpu/gemm_convolution_utils.cpp
+index 90db08edc..3863ce652 100644
+--- a/src/cpu/gemm_convolution_utils.cpp
++++ b/src/cpu/gemm_convolution_utils.cpp
+@@ -22,7 +22,7 @@
+ #include "type_helpers.hpp"
+ #include "utils.hpp"
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "gemm_convolution_utils.hpp"
+ #include "jit_generator.hpp"
+ 
+diff --git a/src/gpu/compute/kernel_arg_list.hpp b/src/gpu/compute/kernel_arg_list.hpp
+index 9c448b93f..3b9a21b17 100644
+--- a/src/gpu/compute/kernel_arg_list.hpp
++++ b/src/gpu/compute/kernel_arg_list.hpp
+@@ -21,7 +21,7 @@
+ #include <cstddef>
+ #include <type_traits>
+ 
+-#include "common/bfloat16.hpp"
++#include "bfloat16.hpp"
+ #include "common/float16.hpp"
+ #include "common/memory_storage.hpp"
+ #include "common/nstl.hpp"
+diff --git a/tests/benchdnn/dnnl_common.hpp b/tests/benchdnn/dnnl_common.hpp
+index 7de6b4f07..19141ddc0 100644
+--- a/tests/benchdnn/dnnl_common.hpp
++++ b/tests/benchdnn/dnnl_common.hpp
+@@ -22,7 +22,7 @@
+ #include <vector>
+ 
+ #include "dnnl.h"
+-#include "src/common/bfloat16.hpp"
++#include "include/bfloat16.hpp"
+ #include "src/common/float16.hpp"
+ #include "src/common/nstl.hpp"
+ 
+diff --git a/tests/gtests/dnnl_test_common.hpp b/tests/gtests/dnnl_test_common.hpp
+index e5563db17..f39b455b9 100644
+--- a/tests/gtests/dnnl_test_common.hpp
++++ b/tests/gtests/dnnl_test_common.hpp
+@@ -40,7 +40,7 @@
+ #include "dnnl_test_common_ocl.hpp"
+ #endif
+ 
+-#include "src/common/bfloat16.hpp"
++#include "include/bfloat16.hpp"
+ #include "src/common/dnnl_thread.hpp"
+ #include "src/common/float16.hpp"
+ #include "src/common/memory_desc_wrapper.hpp"
+diff --git a/tests/gtests/test_gemm_common.hpp b/tests/gtests/test_gemm_common.hpp
+index 702710d58..a48ea44f8 100644
+--- a/tests/gtests/test_gemm_common.hpp
++++ b/tests/gtests/test_gemm_common.hpp
+@@ -106,12 +106,12 @@ dnnl_status_t dnnl_ocl_gemm_u8u8s32(cl_command_queue queue, char transa,
+ #endif
+ 
+ // Declare bfloat16 GEMM interfaces for testing
+-extern "C" {
+-dnnl_status_t dnnl_gemm_bf16bf16f32(char transa, char transb, dnnl_dim_t M,
+-        dnnl_dim_t N, dnnl_dim_t K, float alpha, const bfloat16_t *A,
+-        dnnl_dim_t lda, const bfloat16_t *B, dnnl_dim_t ldb, float beta,
+-        float *C, dnnl_dim_t ldc);
+-}
++// extern "C" {
++// dnnl_status_t dnnl_gemm_bf16bf16f32(char transa, char transb, dnnl_dim_t M,
++//         dnnl_dim_t N, dnnl_dim_t K, float alpha, const bfloat16_t *A,
++//         dnnl_dim_t lda, const bfloat16_t *B, dnnl_dim_t ldb, float beta,
++//         float *C, dnnl_dim_t ldc);
++// }
+ 
+ // Declare packed GEMM interfaces for testing
+ namespace dnnl {
