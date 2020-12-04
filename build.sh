@@ -65,7 +65,9 @@ git clone https://github.com/intel/mkl-dnn.git dnnl-v1.5
 cd dnnl-v1.5/
 git checkout v1.5
 git apply --check ../patch_dnnl-v1.5_bgemm.diff
+git apply --check ../patch_dnnl-v1.5_boost_small_kernel_sgemm.diff
 git apply ../patch_dnnl-v1.5_bgemm.diff
+git apply ../patch_dnnl-v1.5_boost_small_kernel_sgemm.diff
 mkdir -p build && cd build && cmake -DCMAKE_INSTALL_PREFIX=../../local/dnnl-v1.5/ ..
 make -j all
 make install
