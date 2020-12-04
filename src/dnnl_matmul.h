@@ -156,7 +156,6 @@ bool MatMul2(engine eng, stream stm, T_input* input, T_wei* weight, T_output* ou
     auto it_prim_created = g_prim.find(prim_key);
     if (it_prim_created == g_prim.end())
     {
-        std::cout << "log" << std::endl;
         auto src_md     = memory::desc({ src_tz }, src_dt, memory::format_tag::ab);
         auto weights_md = memory::desc({ weights_tz }, weights_dt, memory::format_tag::ab); // ab or ba
         auto dst_md     = memory::desc({ dst_tz }, dst_dt, memory::format_tag::ab);
@@ -259,7 +258,6 @@ bool MatMul2_eltwise(engine eng, stream stm, T_input* input, T_wei* weight, T_ou
     auto it_prim_created = g_prim.find(prim_key);
     if (it_prim_created == g_prim.end())
     {
-        std::cout << "log" << std::endl;
         auto src_md     = memory::desc({ src_tz }, src_dt, memory::format_tag::ab);
         auto weights_md = memory::desc({ weights_tz }, weights_dt, memory::format_tag::ab); // ab or ba
         auto dst_md     = memory::desc({ dst_tz }, dst_dt, memory::format_tag::ab);

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# need to install intel mkl
+sudo dnf --enablerepo=PowerTools install blas-devel
 cur_path=`pwd`
 
 # build mkl-dnn-v1.0.4
@@ -7,8 +9,8 @@ cur_path=`pwd`
 #git clone https://github.com/intel/mkl-dnn.git mkldnn-v1.0.4
 #cd mkldnn-v1.0.4/
 #git checkout v1.0.4
-#git apply --check ../patch_mkldnn-v1.0.4_bf16_structure_API_and_gemm_bf16bf16fp32_20200115.diff
-#git apply ../patch_mkldnn-v1.0.4_bf16_structure_API_and_gemm_bf16bf16fp32_20200115.diff
+#git apply --check ../patch_mkldnn-v1.0.4_bgemm.diff
+#git apply ../patch_mkldnn-v1.0.4_bgemm.diff
 #mkdir -p build && cd build && cmake -DCMAKE_INSTALL_PREFIX=../../local/mkldnn-v1.0.4/ ..
 #make -j all
 #make install
@@ -18,8 +20,8 @@ cur_path=`pwd`
 #git clone https://github.com/intel/mkl-dnn.git dnnl-v1.1.3
 #cd dnnl-v1.1.3/
 #git checkout v1.1.3
-#git apply --check ../patch_dnnl-v1.1.3.diff
-#git apply ../patch_dnnl-v1.1.3.diff
+#git apply --check ../patch_dnnl-v1.1.3_bgemm.diff
+#git apply ../patch_dnnl-v1.1.3_bgemm.diff
 #mkdir -p build && cd build && cmake -DCMAKE_INSTALL_PREFIX=../../local/dnnl-v1.1.3/ ..
 #make -j all
 #make install
@@ -29,8 +31,8 @@ cur_path=`pwd`
 #git clone https://github.com/intel/mkl-dnn.git dnnl-v1.2.1
 #cd dnnl-v1.2.1/
 #git checkout v1.2.1
-#git apply --check ../patch_dnnl-v1.2.1.diff
-#git apply ../patch_dnnl-v1.2.1.diff
+#git apply --check ../patch_dnnl-v1.2.1_bgemm.diff
+#git apply ../patch_dnnl-v1.2.1_bgemm.diff
 #mkdir -p build && cd build && cmake -DCMAKE_INSTALL_PREFIX=../../local/dnnl-v1.2.1/ ..
 #make -j all
 #make install
@@ -40,8 +42,8 @@ cur_path=`pwd`
 #git clone https://github.com/intel/mkl-dnn.git dnnl-v1.3
 #cd dnnl-v1.3/
 #git checkout v1.3
-#git apply --check ../patch_dnnl-v1.3.diff
-#git apply ../patch_dnnl-v1.3.diff
+#git apply --check ../patch_dnnl-v1.3_bgemm.diff
+#git apply ../patch_dnnl-v1.3_bgemm.diff
 #mkdir -p build && cd build && cmake -DCMAKE_INSTALL_PREFIX=../../local/dnnl-v1.3/ ..
 #make -j all
 #make install
@@ -86,7 +88,6 @@ make install
 
 # build libxsmm
 cd $cur_path/obj
-sudo dnf --enablerepo=PowerTools install blas-devel
 git clone https://github.com/hfp/libxsmm.git libxsmm-v1.16.1
 cd libxsmm-v1.16.1
 git checkout 1.16.1
