@@ -19,6 +19,7 @@
 #include "dnnl_common.h"
 #include "dnnl_inner_product.h"
 #include "dnnl_matmul.h"
+#include "dnnl_reorder.h"
 
 void init_param(int m, int n, int k, float *A, float *B, float *C, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16,
                 Eigen::MatrixXf& A_mat, Eigen::MatrixXf& B_mat, Eigen::MatrixXf& C_mat, float *A_pad, float *B_pad, float *C_pad, int A_stride, int B_stride, int C_stride);
@@ -37,9 +38,11 @@ double test_dnnl_gemm_bf16bf16f32_omp_cvt(float *A, float *B, float *C, int m, i
 double test_dnnl_gemm_bf16bf16f32_transB_omp_cvt(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16);
 double test_dnnl_cvt_float_to_bfloat16(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16);
 double test_dnnl_omp_cvt_float_to_bfloat16(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16);
+double test_dnnl_reorder_float_to_bfloat16(engine eng, stream stm, float *input, bfloat16 *output_bf16, int size);
 //double test_jit_cvt_float_to_bfloat16(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16);
 double test_dnnl_cvt_bfloat16_to_float(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16);
 double test_dnnl_omp_cvt_bfloat16_to_float(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16);
+double test_dnnl_reorder_bfloat16_to_float(engine eng, stream stm, bfloat16 *input_bf16, float *output, int size);
 
 template <typename T_A, typename T_B, typename T_bias, typename T_C>
 double test_dnnl_inner_product(engine eng, stream stm, T_A* A_buf, T_B* B_buf, T_bias* bias_buf, T_C* C_buf, int m, int n, int k);
@@ -98,6 +101,13 @@ int main(int argc, char *argv[])
     Eigen::MatrixXf B_mat(k, n);
     Eigen::MatrixXf C_mat(m, n);
 
+    engine cpu_engine;
+    stream cpu_stream;
+
+    stream stream(eng);
+    cpu_engine = eng;
+    cpu_stream = stream;
+
     init_param(m, n, k, A, B, C, A_bf16, B_bf16, C_bf16, A_mat, B_mat, C_mat, A_pad, B_pad, C_pad, A_stride, B_stride, C_stride);
     std::cout << "\nstarting..." << std::endl;
 
@@ -117,16 +127,11 @@ int main(int argc, char *argv[])
     double t_dnnl_gemm_bf16_tB_omp_cvt = test_dnnl_gemm_bf16bf16f32_transB_omp_cvt(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
     double t_dnnl_cvt_f2b     = test_dnnl_cvt_float_to_bfloat16(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
     double t_dnnl_omp_cvt_f2b = test_dnnl_omp_cvt_float_to_bfloat16(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
+    double t_dnnl_reorder_f2b = test_dnnl_reorder_float_to_bfloat16(cpu_engine, cpu_stream, A, A_bf16, m*k);
     //double t_dnnl_jit_cvt = test_jit_cvt_float_to_bfloat16(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
     double t_dnnl_cvt_b2f     = test_dnnl_cvt_bfloat16_to_float(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
     double t_dnnl_omp_cvt_b2f = test_dnnl_omp_cvt_bfloat16_to_float(A, B, C, m, n, k, A_bf16, B_bf16, C_bf16);
-
-    engine cpu_engine;
-    stream cpu_stream;
-
-    stream stream(eng);
-    cpu_engine = eng;
-    cpu_stream = stream;
+    double t_dnnl_reorder_b2f = test_dnnl_reorder_bfloat16_to_float(cpu_engine, cpu_stream, A_bf16, A, m*k);
 
     float *bias = new float[n];
     bfloat16 *bias_bf16 = new bfloat16[n];
@@ -183,9 +188,11 @@ int main(int argc, char *argv[])
     printf("dnnl bgemm+transB+omp_cvt: \t%.6f \t+%.3fX\n", t_dnnl_gemm_bf16_tB_omp_cvt, t_mkl_sgemm/t_dnnl_gemm_bf16_tB_omp_cvt);
     printf("dnnl cvt f2b:              \t%.6f \tt/bgemm:   %.3f%\n", t_dnnl_cvt_f2b,     t_dnnl_cvt_f2b/t_dnnl_gemm_bf16*100);
     printf("dnnl omp_cvt f2b:          \t%.6f \tt/bgemm:   %.3f%\n", t_dnnl_omp_cvt_f2b, t_dnnl_omp_cvt_f2b/t_dnnl_gemm_bf16*100);
+    printf("dnnl reorder f2b:          \t%.6f \tt/bgemm:   %.3f%\n", t_dnnl_reorder_f2b, t_dnnl_reorder_f2b/t_dnnl_gemm_bf16*100);
     //printf("dnnl jit_cvt: \t%.6f \tt/bgemm:   %.3f%\n", t_dnnl_jit_cvt, t_dnnl_jit_cvt/t_dnnl_gemm_bf16*100);
     printf("dnnl cvt b2f:              \t%.6f \tt/bgemm:   %.3f%\n", t_dnnl_cvt_b2f,     t_dnnl_cvt_b2f/t_dnnl_gemm_bf16*100);
     printf("dnnl omp_cvt b2f:          \t%.6f \tt/bgemm:   %.3f%\n", t_dnnl_omp_cvt_b2f, t_dnnl_omp_cvt_b2f/t_dnnl_gemm_bf16*100);
+    printf("dnnl reorder b2f:          \t%.6f \tt/bgemm:   %.3f%\n", t_dnnl_reorder_b2f, t_dnnl_reorder_b2f/t_dnnl_gemm_bf16*100);
 
     printf(">> inner_product, f: fp32, b: bf16, elw: eltwise\n");
     printf("dnnl inner_product  ffff:     \t%.6f \t+%.3fX\n", t_dnnl_ip_ffff,   t_mkl_sgemm/t_dnnl_ip_ffff);
@@ -500,6 +507,22 @@ double test_dnnl_omp_cvt_float_to_bfloat16(float *A, float *B, float *C, int m, 
     return tag_diff;
 }
 
+double test_dnnl_reorder_float_to_bfloat16(engine eng, stream stm, float *input, bfloat16 *output_bf16, int size)
+{
+    Reorder(eng, stm, input, output_bf16, size);
+
+    auto tag_1 = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < 1000; ++i) {
+        Reorder(eng, stm, input, output_bf16, size);
+    }
+
+    auto tag_2 = std::chrono::high_resolution_clock::now();
+    auto tag_diff = std::chrono::duration<double>(tag_2 - tag_1).count();
+    //std::cout << "result: " << C[0] << "," << C[m*n-1] << std::endl;
+
+    return tag_diff;
+}
+
 double test_dnnl_cvt_bfloat16_to_float(float *A, float *B, float *C, int m, int n, int k, bfloat16 *A_bf16, bfloat16 *B_bf16, bfloat16 *C_bf16)
 {
     dnnl::impl::cvt_bfloat16_to_float(A, A_bf16, m*k);
@@ -532,6 +555,22 @@ double test_dnnl_omp_cvt_bfloat16_to_float(float *A, float *B, float *C, int m, 
     auto tag_2 = std::chrono::high_resolution_clock::now();
     auto tag_diff = std::chrono::duration<double>(tag_2 - tag_1).count();
     std::cout << "result: " << C[0] << "," << C[m*n-1] << std::endl;
+
+    return tag_diff;
+}
+
+double test_dnnl_reorder_bfloat16_to_float(engine eng, stream stm, bfloat16 *input_bf16, float *output, int size)
+{
+    Reorder(eng, stm, input_bf16, output, size);
+
+    auto tag_1 = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < 1000; ++i) {
+        Reorder(eng, stm, input_bf16, output, size);
+    }
+
+    auto tag_2 = std::chrono::high_resolution_clock::now();
+    auto tag_diff = std::chrono::duration<double>(tag_2 - tag_1).count();
+    //std::cout << "result: " << C[0] << "," << C[m*n-1] << std::endl;
 
     return tag_diff;
 }
