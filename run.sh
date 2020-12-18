@@ -1,15 +1,22 @@
 #!/bin/bash
 
 # core_num=1
-core_num=8
-# core_num=16
-# core_num=24
-
 # cpus="24"
-cpus="24-31"
+
+# core_num=2
+# cpus="24-25"
+
+core_num=4
+cpus="24-27"
+
+# core_num=8
+# cpus="24-31"
+
+# core_num=16
 # cpus="24-39"
+
+# core_num=24
 # cpus="24-47"
-# cpus="24-47,120-143"
 
 ####################################################################
 ####################### Do Not Modification ########################

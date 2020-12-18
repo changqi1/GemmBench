@@ -139,5 +139,8 @@ forward post-op 支持 eltwise
 
 >> matmul 有BiasAdd的操作
 >> matmul2 没有BiasAdd的操作
+
+>> dnnl::engine
+在函数中频繁定义后又释放engine，虽然code中可以做到独立性，但是会导致stream执行crash，所以需要将engine定义后多次使用
 ```
 
