@@ -1,0 +1,125 @@
+diff --git a/src/cpu/gemm/gemm.cpp b/src/cpu/gemm/gemm.cpp
+index 15d31beec..d68c0d809 100644
+--- a/src/cpu/gemm/gemm.cpp
++++ b/src/cpu/gemm/gemm.cpp
+@@ -19,6 +19,7 @@
+ #include "dnnl_threadpool_iface.hpp"
+ #endif
+ 
++#include "common/verbose.hpp"
+ #include "common/bfloat16.hpp"
+ #include "common/c_types_map.hpp"
+ #include "common/dnnl_thread.hpp"
+@@ -108,15 +109,34 @@ dnnl_status_t extended_sgemm(const char *transa, const char *transb,
+         bool trB = *transb == 't' || *transb == 'T';
+         CBLAS_TRANSPOSE Cblas_trA = trA ? CblasTrans : CblasNoTrans;
+         CBLAS_TRANSPOSE Cblas_trB = trB ? CblasTrans : CblasNoTrans;
+-        cblas_sgemm(CblasColMajor, Cblas_trA, Cblas_trB, *M, *N, *K, *alpha, A,
+-                *lda, B, *ldb, *beta, C, *ldc);
+-        if (bias) {
+-            // Add bias if necessary (bias is applied to columns of C)
+-            dim_t incx = 1, incy = 1;
+-            parallel_nd(*N, [&](dim_t n) {
++        if (get_verbose() == 3) {
++            double ms = get_msec();
++            cblas_sgemm(CblasColMajor, Cblas_trA, Cblas_trB, *M, *N, *K, *alpha, A,
++                    *lda, B, *ldb, *beta, C, *ldc);
++            if (bias) {
++                // Add bias if necessary (bias is applied to columns of C)
++                dim_t incx = 1, incy = 1;
++                parallel_nd(*N, [&](dim_t n) {
+                 dim_t offset = n * (*ldc);
+                 cblas_saxpy(*M, 1.0, bias, incx, C + offset, incy);
+-            });
++                });
++            }
++            ms = get_msec() - ms;
++            printf("dnnl_verbose,exec,cpu,api,cblas_sgemm,A%c_B%c,alpha%g,m%ldk%ldn%ld_lda%ldldb%ldldc%ld,%g\n",
++                    *transa, *transb, *alpha, *M, *K, *N, *lda, *ldb, *ldc, ms);
++            fflush(0);
++        }
++        } else {
++            cblas_sgemm(CblasColMajor, Cblas_trA, Cblas_trB, *M, *N, *K, *alpha, A,
++                    *lda, B, *ldb, *beta, C, *ldc);
++            if (bias) {
++                // Add bias if necessary (bias is applied to columns of C)
++                dim_t incx = 1, incy = 1;
++                parallel_nd(*N, [&](dim_t n) {
++                dim_t offset = n * (*ldc);
++                cblas_saxpy(*M, 1.0, bias, incx, C + offset, incy);
++                });
++            }
+         }
+         msan_unpoison_matrix(C, *M, *N, *ldc, sizeof(*C));
+         return dnnl_success;
+@@ -127,14 +147,37 @@ dnnl_status_t extended_sgemm(const char *transa, const char *transb,
+     if (mayiuse(sse41)) {
+         float *dummy_ao = NULL;
+         float *dummy_bo = NULL;
+-        return gemm_driver(transa, transb, bias ? "C" : NULL, M, N, K, alpha, A,
+-                lda, dummy_ao, B, ldb, dummy_bo, beta, C, ldc, bias,
+-                force_jit_nocopy_gemm);
++        if (get_verbose() == 3) {
++            double ms = get_msec();
++            status = gemm_driver(transa, transb, bias ? "C" : NULL, M, N, K, alpha, A,
++                    lda, dummy_ao, B, ldb, dummy_bo, beta, C, ldc, bias,
++                    force_jit_nocopy_gemm);
++            ms = get_msec() - ms;
++            printf("dnnl_verbose,exec,cpu,api,sgemm:jit,A%c_B%c,alpha%g,m%ldk%ldn%ld_lda%ldldb%ldldc%ld,%g\n",
++                    *transa, *transb, *alpha, *M, *K, *N, *lda, *ldb, *ldc, ms);
++            fflush(0);
++        } else {
++            status = gemm_driver(transa, transb, bias ? "C" : NULL, M, N, K, alpha, A,
++                    lda, dummy_ao, B, ldb, dummy_bo, beta, C, ldc, bias,
++                    force_jit_nocopy_gemm);
++        }
++        return status;
+     }
+ #endif
+ 
+-    return ref_gemm<float>(
+-            transa, transb, M, N, K, alpha, A, lda, B, ldb, beta, C, ldc, bias);
++    if (get_verbose() == 3) {
++        double ms = get_msec();
++        status = ref_gemm<float>(
++                transa, transb, M, N, K, alpha, A, lda, B, ldb, beta, C, ldc, bias);
++        ms = get_msec() - ms;
++        printf("dnnl_verbose,exec,cpu,api,ref_sgemm,A%c_B%c,alpha%g,m%ldk%ldn%ld_lda%ldldb%ldldc%ld,%g\n",
++                *transa, *transb, *alpha, *M, *K, *N, *lda, *ldb, *ldc, ms);
++        fflush(0);
++    } else {
++        status = ref_gemm<float>(
++                transa, transb, M, N, K, alpha, A, lda, B, ldb, beta, C, ldc, bias);
++    }
++    return status;
+ }
+ 
+ // Tries calling Intel MKL cblas_gemm_s8u8s32 if applicable and available
+@@ -243,10 +286,23 @@ dnnl_status_t gemm_bf16bf16f32(const char *transa, const char *transb,
+     bfloat16_t *dummy_bo = NULL;
+     float *dummy_co = NULL;
+ 
+-    if (mayiuse(avx512_core))
+-        return gemm_driver(transa, transb, dummyOffsetC, M, N, K, alpha,
+-                (const bfloat16_t *)A, lda, dummy_ao, (const bfloat16_t *)B,
+-                ldb, dummy_bo, beta, (float *)C, ldc, dummy_co, false);
++    if (mayiuse(avx512_core)) {
++        if (get_verbose() == 3) {
++            double ms = get_msec();
++            status = gemm_driver(transa, transb, dummyOffsetC, M, N, K, alpha,
++                    (const bfloat16_t *)A, lda, dummy_ao, (const bfloat16_t *)B,
++                    ldb, dummy_bo, beta, (float *)C, ldc, dummy_co, false);
++            ms = get_msec() - ms;
++            printf("dnnl_verbose,exec,cpu,api,gemm_bf16bf16f32,A%c_B%c,alpha%g,m%ldk%ldn%ld_lda%ldldb%ldldc%ld,%g\n",
++                    *transa, *transb, *alpha, *M, *K, *N, *lda, *ldb, *ldc, ms);
++            fflush(0);
++        } else {
++            status = gemm_driver(transa, transb, dummyOffsetC, M, N, K, alpha,
++                    (const bfloat16_t *)A, lda, dummy_ao, (const bfloat16_t *)B,
++                    ldb, dummy_bo, beta, (float *)C, ldc, dummy_co, false);
++        }
++        return status;
++    }
+ #endif
+ 
+     return dnnl_unimplemented;
