@@ -1,8 +1,8 @@
 diff --git a/include/oneapi/dnnl/dnnl.h b/include/oneapi/dnnl/dnnl.h
-index 1dc4a261d..7657a660e 100644
+index 1dc4a261d..22d9cc1cf 100644
 --- a/include/oneapi/dnnl/dnnl.h
 +++ b/include/oneapi/dnnl/dnnl.h
-@@ -3742,6 +3742,50 @@ dnnl_status_t DNNL_API dnnl_gemm_s8s8s32(char transa, char transb, char offsetc,
+@@ -3742,6 +3742,60 @@ dnnl_status_t DNNL_API dnnl_gemm_s8s8s32(char transa, char transb, char offsetc,
          dnnl_dim_t lda, int8_t ao, const int8_t *B, dnnl_dim_t ldb, int8_t bo,
          float beta, int32_t *C, dnnl_dim_t ldc, const int32_t *co);
  
@@ -50,22 +50,49 @@ index 1dc4a261d..7657a660e 100644
 +       dnnl_dim_t N, dnnl_dim_t K, float alpha, const dnnl_bfloat16_t *A, dnnl_dim_t lda,
 +       const dnnl_bfloat16_t *B, dnnl_dim_t ldb, float beta, float *C, dnnl_dim_t ldc);
 +
++void DNNL_API dnnl_cvt_float_to_bfloat16(dnnl_bfloat16_t *out, const float *inp, size_t nelems);
++
++void DNNL_API dnnl_cvt_bfloat16_to_float(float *out, const dnnl_bfloat16_t *inp, size_t nelems);
++
++// performs element-by-element sum of inp and add float arrays and stores
++// result to bfloat16 out array with downconversion
++// out[:] = (dnnl_bfloat16_t)(inp0[:] + inp1[:])
++void DNNL_API dnnl_add_floats_and_cvt_to_bfloat16(
++        dnnl_bfloat16_t *out, const float *inp0, const float *inp1, size_t nelems);
++
  /// @} dnnl_api_blas
  
  /// @} dnnl_api
 diff --git a/include/oneapi/dnnl/dnnl.hpp b/include/oneapi/dnnl/dnnl.hpp
-index 8f6370c1b..70b7ce1e0 100644
+index 8f6370c1b..46e1607a2 100644
 --- a/include/oneapi/dnnl/dnnl.hpp
 +++ b/include/oneapi/dnnl/dnnl.hpp
-@@ -11020,6 +11020,13 @@ inline status gemm_s8s8s32(char transa, char transb, char offsetc, dnnl_dim_t M,
+@@ -11020,6 +11020,30 @@ inline status gemm_s8s8s32(char transa, char transb, char offsetc, dnnl_dim_t M,
              K, alpha, A, lda, ao, B, ldb, bo, beta, C, ldc, co));
  }
  
++/// @copydoc gemm_bf16bf16f32()
 +inline status gemm_bf16bf16f32(char transa, char transb, dnnl_dim_t M, dnnl_dim_t N,
 +        dnnl_dim_t K, float alpha, const dnnl_bfloat16_t *A, dnnl_dim_t lda,
 +        const dnnl_bfloat16_t *B, dnnl_dim_t ldb, float beta, float *C, dnnl_dim_t ldc) {
 +    return static_cast<status>(dnnl_gemm_bf16bf16f32(
 +            transa, transb, M, N, K, alpha, A, lda, B, ldb, beta, C, ldc));
++}
++
++/// @copydoc cvt_float_to_bfloat16()
++inline void cvt_float_to_bfloat16(dnnl_bfloat16_t *out, const float *inp, size_t nelems) {
++    dnnl_cvt_float_to_bfloat16(out, inp, nelems);
++}
++
++/// @copydoc cvt_bfloat16_to_float()
++inline void cvt_bfloat16_to_float(float *out, const dnnl_bfloat16_t *inp, size_t nelems) {
++    dnnl_cvt_bfloat16_to_float(out, inp, nelems);
++}
++
++/// @copydoc add_floats_and_cvt_to_bfloat16()
++inline void add_floats_and_cvt_to_bfloat16(
++        dnnl_bfloat16_t *out, const float *inp0, const float *inp1, size_t nelems) {
++    dnnl_add_floats_and_cvt_to_bfloat16(out, inp0, inp1, nelems);
 +}
 +
  /// @} dnnl_api_blas
@@ -131,7 +158,7 @@ index 6ad50f084..422fb3c44 100644
 -} // namespace impl
 -} // namespace dnnl
 diff --git a/src/common/bfloat16.hpp b/src/common/bfloat16.hpp
-index 20fe0f5b0..046725921 100644
+index 20fe0f5b0..1629cf86b 100644
 --- a/src/common/bfloat16.hpp
 +++ b/src/common/bfloat16.hpp
 @@ -29,9 +29,6 @@
@@ -153,13 +180,19 @@ index 20fe0f5b0..046725921 100644
  
      bfloat16_t DNNL_API &operator=(float f);
  
-@@ -89,7 +86,4 @@ void cvt_bfloat16_to_float(float *out, const bfloat16_t *inp, size_t nelems);
+@@ -89,7 +86,11 @@ void cvt_bfloat16_to_float(float *out, const bfloat16_t *inp, size_t nelems);
  void add_floats_and_cvt_to_bfloat16(
          bfloat16_t *out, const float *inp0, const float *inp1, size_t nelems);
  
 -} // namespace impl
 -} // namespace dnnl
--
++void dnnl_cvt_float_to_bfloat16(bfloat16_t *out, const float *inp, size_t nelems);
++
++void dnnl_cvt_bfloat16_to_float(float *out, const bfloat16_t *inp, size_t nelems);
++
++void dnnl_add_floats_and_cvt_to_bfloat16(
++        bfloat16_t *out, const float *inp0, const float *inp1, size_t nelems);
+ 
  #endif
 diff --git a/src/common/gemm.cpp b/src/common/gemm.cpp
 index 72f5b73e5..885b0312f 100644
@@ -184,7 +217,7 @@ index 72f5b73e5..885b0312f 100644
          const bfloat16_t *A, dim_t lda, const bfloat16_t *B, dim_t ldb,
          float beta, float *C, dim_t ldc, void *th) {
 diff --git a/src/cpu/bfloat16.cpp b/src/cpu/bfloat16.cpp
-index 62c75d445..e247a633a 100644
+index 62c75d445..0d01d4788 100644
 --- a/src/cpu/bfloat16.cpp
 +++ b/src/cpu/bfloat16.cpp
 @@ -28,8 +28,7 @@
@@ -197,13 +230,25 @@ index 62c75d445..e247a633a 100644
  
  bool try_cvt_float_to_bfloat16(bfloat16_t *out, const float *inp) {
  
-@@ -98,6 +97,3 @@ void add_floats_and_cvt_to_bfloat16(
-     for (size_t i = 0; i < nelems; ++i)
+@@ -99,5 +98,15 @@ void add_floats_and_cvt_to_bfloat16(
          out[i] = inp0[i] + inp1[i];
  }
--
+ 
 -} // namespace impl
 -} // namespace dnnl
++void dnnl_cvt_float_to_bfloat16(bfloat16_t *out, const float *inp, size_t nelems) {
++    cvt_float_to_bfloat16(out, inp, nelems);
++}
++
++void dnnl_cvt_bfloat16_to_float(float *out, const bfloat16_t *inp, size_t nelems) {
++    cvt_bfloat16_to_float(out, inp, nelems);
++}
++
++void dnnl_add_floats_and_cvt_to_bfloat16(
++        bfloat16_t *out, const float *inp0, const float *inp1, size_t nelems) {
++    add_floats_and_cvt_to_bfloat16(out, inp0, inp1, nelems);
++}
+\ No newline at end of file
 diff --git a/tests/benchdnn/dnnl_common.cpp b/tests/benchdnn/dnnl_common.cpp
 index caa79d222..a8fb28090 100644
 --- a/tests/benchdnn/dnnl_common.cpp
