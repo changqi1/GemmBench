@@ -1,16 +1,16 @@
 diff --git a/src/cpu/gemm/gemm.cpp b/src/cpu/gemm/gemm.cpp
-index 15d31beec..d68c0d809 100644
+index af699ee0c..116c6dd91 100644
 --- a/src/cpu/gemm/gemm.cpp
 +++ b/src/cpu/gemm/gemm.cpp
-@@ -19,6 +19,7 @@
- #include "dnnl_threadpool_iface.hpp"
- #endif
+@@ -16,6 +16,7 @@
+ 
+ #include "oneapi/dnnl/dnnl.h"
  
 +#include "common/verbose.hpp"
  #include "common/bfloat16.hpp"
  #include "common/c_types_map.hpp"
  #include "common/dnnl_thread.hpp"
-@@ -108,15 +109,34 @@ dnnl_status_t extended_sgemm(const char *transa, const char *transb,
+@@ -105,15 +106,33 @@ dnnl_status_t extended_sgemm(const char *transa, const char *transb,
          bool trB = *transb == 't' || *transb == 'T';
          CBLAS_TRANSPOSE Cblas_trA = trA ? CblasTrans : CblasNoTrans;
          CBLAS_TRANSPOSE Cblas_trB = trB ? CblasTrans : CblasNoTrans;
@@ -51,12 +51,12 @@ index 15d31beec..d68c0d809 100644
          }
          msan_unpoison_matrix(C, *M, *N, *ldc, sizeof(*C));
          return dnnl_success;
-@@ -127,14 +147,37 @@ dnnl_status_t extended_sgemm(const char *transa, const char *transb,
+@@ -124,14 +143,37 @@ dnnl_status_t extended_sgemm(const char *transa, const char *transb,
      if (mayiuse(sse41)) {
          float *dummy_ao = nullptr;
          float *dummy_bo = nullptr;
--        return gemm_driver(transa, transb, bias ? "C" : nullptr, M, N, K, alpha, A,
--                lda, dummy_ao, B, ldb, dummy_bo, beta, C, ldc, bias,
+-        return gemm_driver(transa, transb, bias ? "C" : nullptr, M, N, K, alpha,
+-                A, lda, dummy_ao, B, ldb, dummy_bo, beta, C, ldc, bias,
 -                force_jit_nocopy_gemm);
 +        if (get_verbose() == 3) {
 +            double ms = get_msec();
@@ -94,7 +94,7 @@ index 15d31beec..d68c0d809 100644
  }
  
  // Tries calling Intel MKL cblas_gemm_s8u8s32 if applicable and available
-@@ -243,10 +286,23 @@ dnnl_status_t gemm_bf16bf16f32(const char *transa, const char *transb,
+@@ -240,10 +282,23 @@ dnnl_status_t gemm_bf16bf16f32(const char *transa, const char *transb,
      bfloat16_t *dummy_bo = nullptr;
      float *dummy_co = nullptr;
  
